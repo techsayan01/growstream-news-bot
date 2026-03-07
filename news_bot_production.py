@@ -62,7 +62,11 @@ def validate_config():
         raise EnvironmentError(f"Missing required config: {', '.join(missing)}")
     log.info("✓ Configuration validated")
 
-client = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
+    client = anthropic.Anthropic(
+        api_key=CLAUDE_API_KEY,
+        timeout=60.0,
+        max_retries=2,
+    )
 
 # ============================================================
 # RETRY DECORATOR
