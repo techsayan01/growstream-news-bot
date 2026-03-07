@@ -1,0 +1,40 @@
+name: GrowStream News Bot
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # Daily 2am UTC = 7:30am IST
+  workflow_dispatch:        # Manual trigger from GitHub UI
+
+jobs:
+  publish-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install anthropic feedparser requests
+
+      - name: Run news bot
+        id: run_bot
+        env:
+          CLAUDE_API_KEY:   ${{ secrets.CLAUDE_API_KEY }}
+          WP_USERNAME:      ${{ secrets.WP_USERNAME }}
+          WP_PASSWORD:      ${{ secrets.WP_PASSWORD }}
+          UNSPLASH_API_KEY: ${{ secrets.UNSPLASH_API_KEY }}
+        run: python news_bot_production.py
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: error-logs
+          path: "*.log"
+          retention-days: 7
