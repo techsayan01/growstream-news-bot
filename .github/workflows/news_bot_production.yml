@@ -33,7 +33,7 @@ jobs:
           WP_USERNAME:      ${{ secrets.WP_USERNAME }}
           WP_PASSWORD:      ${{ secrets.WP_PASSWORD }}
           UNSPLASH_API_KEY: ${{ secrets.UNSPLASH_API_KEY }}
-        run: python test_api.py
+        run: python news_bot_production.py
 
       - name: Upload logs on failure
         if: failure()
