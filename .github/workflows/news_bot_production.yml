@@ -3,7 +3,7 @@ name: GrowStream News Bot
 on:
   schedule:
     - cron: '0 2 * * *'   # Daily 2am UTC = 7:30am IST
-  workflow_dispatch:        # Manual trigger from GitHub UI
+  workflow_dispatch:
 
 jobs:
   publish-news:
@@ -21,10 +21,22 @@ jobs:
 
       - name: Install dependencies
         run: pip install anthropic feedparser requests httpx[http2]
-        
-      - name: Test network connectivity
+
+      - name: Test Anthropic API connectivity
+        env:
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: |
-          curl -I https://api.anthropic.com || echo "Network check failed"
+          python - <<'PYEOF'
+          import anthropic, os
+          print("Testing Anthropic API connection...")
+          client = anthropic.Anthropic(api_key=os.environ["CLAUDE_API_KEY"])
+          r = client.messages.create(
+              model="claude-haiku-4-5-20251001",
+              max_tokens=20,
+              messages=[{"role": "user", "content": "Say OK"}]
+          )
+          print("SUCCESS:", r.content[0].text)
+          PYEOF
 
       - name: Run news bot
         id: run_bot
