@@ -21,6 +21,10 @@ jobs:
 
       - name: Install dependencies
         run: pip install anthropic feedparser requests
+        
+      - name: Test network connectivity
+        run: |
+          curl -I https://api.anthropic.com || echo "Network check failed"
 
       - name: Run news bot
         id: run_bot
