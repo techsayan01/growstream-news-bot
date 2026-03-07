@@ -8,7 +8,6 @@ Image Agent              — Unsplash free API (3 images per article)
 Publisher                — Claude Haiku rewrites + posts to WordPress
 
 Cost: ~$3.50/month | Output: 5 articles/day, 1 per category
-Error handling: Retries, fallbacks, graceful degradation
 """
 
 import anthropic
@@ -24,7 +23,7 @@ from datetime import datetime
 from functools import wraps
 
 # ============================================================
-# LOGGING SETUP
+# LOGGING
 # ============================================================
 logging.basicConfig(
     level=logging.INFO,
@@ -45,12 +44,10 @@ WP_URL           = "https://growstreammedia.com"
 WP_USERNAME      = os.environ.get("WP_USERNAME", "newsbot")
 WP_PASSWORD      = os.environ.get("WP_PASSWORD", "")
 
-# Retry settings
-MAX_RETRIES     = 3
-RETRY_DELAY     = 5   # seconds between retries
-REQUEST_TIMEOUT = 15  # seconds for HTTP requests
+MAX_RETRIES      = 3
+RETRY_DELAY      = 5
+REQUEST_TIMEOUT  = 15
 
-# Validate required env vars on startup
 def validate_config():
     missing = []
     if not CLAUDE_API_KEY:   missing.append("CLAUDE_API_KEY")
@@ -58,11 +55,15 @@ def validate_config():
     if not WP_USERNAME:      missing.append("WP_USERNAME")
     if not WP_PASSWORD:      missing.append("WP_PASSWORD")
     if missing:
-        log.error(f"Missing environment variables: {', '.join(missing)}")
         raise EnvironmentError(f"Missing required config: {', '.join(missing)}")
     log.info("✓ Configuration validated")
 
-    client = anthropic.Anthropic(
+# ============================================================
+# ANTHROPIC CLIENT — initialized once after config validation
+# ============================================================
+def get_client():
+    """Return Anthropic client. Called lazily so config is validated first."""
+    return anthropic.Anthropic(
         api_key=CLAUDE_API_KEY,
         timeout=60.0,
         max_retries=2,
@@ -72,7 +73,6 @@ def validate_config():
 # RETRY DECORATOR
 # ============================================================
 def with_retry(max_retries=MAX_RETRIES, delay=RETRY_DELAY, fallback=None):
-    """Decorator: retry a function up to max_retries times with delay."""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -96,7 +96,6 @@ def with_retry(max_retries=MAX_RETRIES, delay=RETRY_DELAY, fallback=None):
 
 
 def safe_json_parse(raw_text):
-    """Safely parse JSON from Claude response, stripping markdown if needed."""
     text = raw_text.strip()
     if text.startswith("```"):
         parts = text.split("```")
@@ -111,46 +110,45 @@ def safe_json_parse(raw_text):
 
 
 # ============================================================
-# RSS FEEDS — mapped per category (all free)
+# RSS FEEDS
 # ============================================================
 CATEGORY_FEEDS = {
     "ai-in-banking": [
         "https://www.finextra.com/rss/channel.aspx?channel=ai",
-        "https://www.bankingtech.com/feed/",
         "https://feeds.feedburner.com/venturebeat/SZYF",
         "https://www.pymnts.com/feed/",
+        "https://techcrunch.com/feed/",
     ],
     "fintech-news": [
         "https://techcrunch.com/category/fintech/feed/",
         "https://www.finextra.com/rss/headlines.aspx",
         "https://www.pymnts.com/feed/",
-        "https://feeds.reuters.com/reuters/businessNews",
+        "https://feeds.feedburner.com/venturebeat/SZYF",
     ],
     "investment-ai": [
-        "https://feeds.bloomberg.com/markets/news.rss",
-        "https://feeds.reuters.com/reuters/businessNews",
         "https://feeds.feedburner.com/venturebeat/SZYF",
-        "https://www.investing.com/rss/news.rss",
+        "https://techcrunch.com/feed/",
+        "https://www.pymnts.com/feed/",
+        "https://www.finextra.com/rss/headlines.aspx",
     ],
     "regulatory-updates": [
-        "https://feeds.reuters.com/reuters/businessNews",
         "https://www.finextra.com/rss/channel.aspx?channel=regulation",
-        "https://feeds.bloomberg.com/markets/news.rss",
         "https://techcrunch.com/feed/",
+        "https://www.pymnts.com/feed/",
+        "https://feeds.feedburner.com/venturebeat/SZYF",
     ],
     "tool-reviews": [
         "https://feeds.feedburner.com/venturebeat/SZYF",
         "https://techcrunch.com/feed/",
         "https://www.artificialintelligence-news.com/feed/",
-        "https://feeds.reuters.com/reuters/technologyNews",
+        "https://www.pymnts.com/feed/",
     ],
 }
 
-# Fallback feeds used if primary feeds return nothing
 FALLBACK_FEEDS = [
     "https://techcrunch.com/feed/",
-    "https://feeds.reuters.com/reuters/businessNews",
     "https://feeds.feedburner.com/venturebeat/SZYF",
+    "https://www.pymnts.com/feed/",
 ]
 
 # ============================================================
@@ -191,26 +189,21 @@ CATEGORIES = [
 
 
 # ============================================================
-# AGENT 1: RESEARCH AGENT — Free RSS feeds
+# AGENT 1: RESEARCH — Free RSS
 # ============================================================
 def research_agent(category):
-    """Pull latest stories from RSS feeds. Falls back to generic feeds if needed."""
     log.info(f"🔍 [Agent 1] Fetching RSS for: {category['name']}")
-
-    feeds = CATEGORY_FEEDS[category["slug"]]
+    feeds   = CATEGORY_FEEDS[category["slug"]]
     stories = _fetch_from_feeds(feeds, category["keywords"])
 
-    # Fallback: if too few stories, try generic feeds
     if len(stories) < 3:
-        log.warning(f"  ⚠ Only {len(stories)} stories found. Trying fallback feeds...")
-        fallback_stories = _fetch_from_feeds(FALLBACK_FEEDS, category["keywords"])
-        stories = stories + fallback_stories
+        log.warning(f"  ⚠ Only {len(stories)} stories — trying fallback feeds")
+        stories += _fetch_from_feeds(FALLBACK_FEEDS, category["keywords"])
 
     if not stories:
-        log.error(f"  ✗ No stories found for {category['name']} from any feed")
+        log.error(f"  ✗ No stories found for {category['name']}")
         return None
 
-    # Deduplicate and shuffle
     seen, unique = set(), []
     for s in stories:
         key = s["headline"][:40].lower()
@@ -225,12 +218,11 @@ def research_agent(category):
 
 
 def _fetch_from_feeds(feeds, keywords):
-    """Helper: fetch and filter stories from a list of RSS feeds."""
     stories = []
     for feed_url in feeds:
         try:
             feed = feedparser.parse(feed_url)
-            if feed.bozo:  # feedparser marks malformed feeds
+            if feed.bozo:
                 log.warning(f"  ⚠ Malformed feed: {feed_url[:50]}")
                 continue
             for entry in feed.entries[:8]:
@@ -254,11 +246,10 @@ def _fetch_from_feeds(feeds, keywords):
 
 
 # ============================================================
-# AGENT 2: SUMMARY AGENT — Claude Sonnet with retry
+# AGENT 2: SUMMARY — Claude Sonnet
 # ============================================================
 @with_retry(max_retries=3, delay=5)
 def summary_agent(stories, category):
-    """Score and rank stories by market trend relevance."""
     log.info(f"📊 [Agent 2] Ranking {len(stories)} stories for {category['name']}")
 
     stories_json = json.dumps([{
@@ -273,15 +264,14 @@ def summary_agent(stories, category):
 Score each story's MARKET TREND RELEVANCE (1-10) based on:
 - Impact on financial markets and businesses
 - Relevance to CFOs, investors, finance professionals
-- Timeliness and breaking nature
+- Timeliness and newsworthiness
 
-For each story identify the market trend:
-AI Infrastructure Boom | Fintech Disruption | Regulatory Crackdown | Investment AI | Banking Transformation
+Market trends: AI Infrastructure Boom | Fintech Disruption | Regulatory Crackdown | Investment AI | Banking Transformation
 
 Stories:
 {stories_json}
 
-Select the SINGLE BEST story. Return ONLY this JSON object, no markdown:
+Select the SINGLE BEST story. Return ONLY this JSON, no markdown:
 {{
   "best_story": {{
     "headline": "...",
@@ -294,7 +284,7 @@ Select the SINGLE BEST story. Return ONLY this JSON object, no markdown:
   }}
 }}"""
 
-    response = client.messages.create(
+    response = get_client().messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1500,
         messages=[{"role": "user", "content": prompt}]
@@ -309,11 +299,10 @@ Select the SINGLE BEST story. Return ONLY this JSON object, no markdown:
 
 
 # ============================================================
-# AGENT 3: FACT-CHECK AGENT — Claude Sonnet with retry
+# AGENT 3: FACT-CHECK — Claude Sonnet
 # ============================================================
 @with_retry(max_retries=3, delay=5)
 def factcheck_agent(best_story, category):
-    """Verify story and extract image keywords."""
     log.info(f"✅ [Agent 3] Fact-checking for {category['name']}")
 
     prompt = f"""You are a fact-checking editor at GrowStream Media.
@@ -321,9 +310,9 @@ def factcheck_agent(best_story, category):
 Review this story for the '{category['name']}' section:
 {json.dumps(best_story, indent=2)}
 
-Check credibility, internal consistency, and suitability for business professionals.
+Check credibility, consistency, and suitability for business professionals.
 
-Return ONLY this JSON object, no markdown:
+Return ONLY this JSON, no markdown:
 {{
   "approved": true,
   "credibility_score": 8,
@@ -333,7 +322,7 @@ Return ONLY this JSON object, no markdown:
   "story": {{ ...all original story fields... }}
 }}"""
 
-    response = client.messages.create(
+    response = get_client().messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1000,
         messages=[{"role": "user", "content": prompt}]
@@ -349,10 +338,9 @@ Return ONLY this JSON object, no markdown:
 
 
 # ============================================================
-# IMAGE AGENT — Unsplash with fallback keywords
+# IMAGE AGENT — Unsplash
 # ============================================================
 def fetch_unsplash_images(image_keywords, category_style, count=3):
-    """Fetch 3 images with fallback to generic finance/tech terms."""
     images = []
     primary_queries = [
         " ".join(image_keywords[:2]),
@@ -362,20 +350,19 @@ def fetch_unsplash_images(image_keywords, category_style, count=3):
     fallback_queries = ["finance technology", "business data", "digital economy"]
 
     for i in range(count):
-        query   = primary_queries[i] if i < len(primary_queries) else fallback_queries[i]
-        image   = _fetch_single_image(query, i)
+        query = primary_queries[i] if i < len(primary_queries) else fallback_queries[i]
+        image = _fetch_single_image(query, i)
         if not image:
-            log.warning(f"  ⚠ Primary query failed for '{query}', trying fallback")
+            log.warning(f"  ⚠ Trying fallback image query")
             image = _fetch_single_image(fallback_queries[i % len(fallback_queries)], i)
         if image:
             images.append(image)
 
-    log.info(f"  📸 {len(images)}/3 images fetched from Unsplash")
+    log.info(f"  📸 {len(images)}/3 images fetched")
     return images
 
 
 def _fetch_single_image(query, index):
-    """Fetch one image from Unsplash with error handling."""
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             response = requests.get(
@@ -389,7 +376,6 @@ def _fetch_single_image(query, index):
             results = response.json().get("results", [])
             if results:
                 photo = max(results, key=lambda x: x.get("width", 0))
-                # Trigger download (Unsplash API requirement)
                 try:
                     requests.get(
                         photo["links"]["download_location"],
@@ -415,12 +401,12 @@ def _fetch_single_image(query, index):
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY)
             else:
-                log.error(f"  ✗ Image fetch failed for '{query}': {e}")
+                log.error(f"  ✗ Image fetch failed: {e}")
     return None
 
 
 # ============================================================
-# PUBLISHER — Claude Haiku + WordPress REST API
+# PUBLISHER — WordPress REST API
 # ============================================================
 def get_wp_auth():
     credentials = f"{WP_USERNAME}:{WP_PASSWORD}"
@@ -428,7 +414,6 @@ def get_wp_auth():
 
 
 def get_wp_category_id(slug):
-    """Get WordPress category ID with retry."""
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             r = requests.get(
@@ -446,13 +431,12 @@ def get_wp_category_id(slug):
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY)
             else:
-                log.error(f"  ✗ Could not fetch category ID for '{slug}': {e}")
+                log.error(f"  ✗ Could not fetch category '{slug}': {e}")
     return None
 
 
 @with_retry(max_retries=3, delay=5)
 def rewrite_article(story, category, angle):
-    """Rewrite story into polished article using Haiku."""
     log.info(f"  ✍️  Writing article...")
     prompt = f"""You are a senior journalist at GrowStream Media writing for the {category['name']} section.
 Target audience: CFOs, investors, finance professionals.
@@ -474,21 +458,20 @@ Write a 300-350 word article:
 Rules: Separate paragraphs with blank line. No title. Professional tone.
 Return ONLY the article body."""
 
-    response = client.messages.create(
+    response = get_client().messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=1000,
         messages=[{"role": "user", "content": prompt}]
     )
     content = response.content[0].text.strip()
     if len(content) < 100:
-        raise ValueError("Article too short — likely a bad response")
+        raise ValueError("Article too short")
     return content
 
 
 @with_retry(max_retries=2, delay=3, fallback=lambda: "Untitled Article")
 def generate_seo_title(headline, market_trend):
-    """Generate SEO title with fallback to original headline."""
-    response = client.messages.create(
+    response = get_client().messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=80,
         messages=[{"role": "user", "content":
@@ -499,14 +482,11 @@ def generate_seo_title(headline, market_trend):
 
 
 def upload_image_to_wordpress(image_data, title):
-    """Upload image to WordPress media library with retry."""
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             img_response = requests.get(image_data["url"], timeout=REQUEST_TIMEOUT)
             img_response.raise_for_status()
-
-            filename = (f"{title[:30].replace(' ','-').lower()}"
-                        f"-{datetime.now().strftime('%H%M%S')}.jpg")
+            filename = f"{title[:30].replace(' ','-').lower()}-{datetime.now().strftime('%H%M%S')}.jpg"
             response = requests.post(
                 f"{WP_URL}/wp-json/wp/v2/media",
                 headers={
@@ -521,20 +501,19 @@ def upload_image_to_wordpress(image_data, title):
                 media = response.json()
                 return {"id": media["id"], "url": media["source_url"]}
             elif response.status_code == 401:
-                log.error("  ✗ WordPress auth failed — check WP_USERNAME and WP_PASSWORD")
+                log.error("  ✗ WordPress auth failed")
                 return None
             else:
-                log.warning(f"  ⚠ Image upload error {response.status_code}: {response.text[:100]}")
+                log.warning(f"  ⚠ Image upload {response.status_code}")
         except Exception as e:
-            log.warning(f"  ⚠ Image upload attempt {attempt}/{MAX_RETRIES}: {e}")
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY)
-    log.error("  ✗ Image upload failed after all retries")
+            else:
+                log.error(f"  ✗ Image upload failed: {e}")
     return None
 
 
 def build_html(content, images, story):
-    """Build article HTML with images at strategic positions."""
     paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
     trend = story.get('market_trend', 'AI & Finance')
     score = story.get('market_relevance_score', 'N/A')
@@ -562,7 +541,6 @@ def build_html(content, images, story):
 
 
 def publish_to_wordpress(title, html_content, category_id, featured_image_id):
-    """Publish to WordPress with retry."""
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             response = requests.post(
@@ -579,22 +557,17 @@ def publish_to_wordpress(title, html_content, category_id, featured_image_id):
             )
             if response.status_code == 201:
                 return response.json().get("link", "")
-            elif response.status_code == 401:
-                log.error("  ✗ WordPress auth failed — check credentials")
-                return None
-            elif response.status_code == 403:
-                log.error("  ✗ WordPress permissions denied — newsbot needs Administrator role")
+            elif response.status_code in [401, 403]:
+                log.error(f"  ✗ WordPress auth/permissions error {response.status_code}")
                 return None
             else:
-                log.warning(f"  ⚠ Publish attempt {attempt}: {response.status_code} {response.text[:100]}")
+                log.warning(f"  ⚠ Publish attempt {attempt}: {response.status_code}")
         except requests.exceptions.Timeout:
             log.warning(f"  ⚠ Publish timeout attempt {attempt}/{MAX_RETRIES}")
         except Exception as e:
             log.warning(f"  ⚠ Publish attempt {attempt}: {e}")
-
         if attempt < MAX_RETRIES:
             time.sleep(RETRY_DELAY)
-
     log.error("  ✗ Publish failed after all retries")
     return None
 
@@ -610,7 +583,6 @@ def run():
     log.info("  Est. cost: ~$0.12/day | ~$3.50/month")
     log.info("="*60)
 
-    # Validate config before starting
     try:
         validate_config()
     except EnvironmentError as e:
@@ -627,25 +599,23 @@ def run():
         log.info(f"{'─'*50}")
 
         try:
-            # Agent 1 — RSS Research (free, no retry needed — handles internally)
+            # Agent 1 — RSS (free)
             stories = research_agent(category)
             if not stories:
-                log.warning(f"Skipping {category['name']} — no stories found")
                 skipped += 1
                 continue
 
-            # Agent 2 — Sonnet Summary (with retry)
+            # Agent 2 — Summary
             summary = summary_agent(stories, category)
             if not summary:
-                log.warning(f"Skipping {category['name']} — summary failed")
                 skipped += 1
                 continue
             best_story = summary.get("best_story", {})
 
-            # Agent 3 — Sonnet Fact-Check (with retry)
+            # Agent 3 — Fact-check
             factcheck = factcheck_agent(best_story, category)
             if not factcheck or not factcheck.get("approved"):
-                log.warning(f"Skipping {category['name']} — story not approved")
+                log.warning(f"Story not approved for {category['name']}, skipping")
                 skipped += 1
                 continue
 
@@ -653,41 +623,38 @@ def run():
             angle        = factcheck.get("suggested_angle", "")
             img_keywords = factcheck.get("image_keywords", category["image_style"].split())
 
-            # Image Agent — Unsplash (with fallback)
+            # Images
             images = fetch_unsplash_images(img_keywords, category["image_style"])
-            if not images:
-                log.warning("  ⚠ No images fetched — publishing without images")
 
-            # Haiku Rewrite (with retry)
+            # Rewrite
             content = rewrite_article(story, category, angle)
             if not content:
-                log.warning(f"Skipping {category['name']} — rewrite failed")
                 skipped += 1
                 continue
 
-            # SEO Title (with fallback to original headline)
+            # SEO title
             seo_title = generate_seo_title(
                 story.get("headline", ""),
                 story.get("market_trend", category["name"])
             )
             log.info(f"  📰 {seo_title}")
 
-            # Upload hero image (optional — publish continues even if it fails)
+            # Upload hero image
             featured_id = None
             if images:
-                log.info(f"  ⬆️  Uploading hero image...")
+                log.info("  ⬆️  Uploading hero image...")
                 uploaded = upload_image_to_wordpress(images[0], seo_title)
                 if uploaded:
                     featured_id = uploaded["id"]
                     log.info(f"  ✓ Hero image ID: {featured_id}")
                 else:
-                    log.warning("  ⚠ Hero image upload failed — publishing without featured image")
+                    log.warning("  ⚠ Hero upload failed — publishing without featured image")
 
-            # Build HTML + Publish
+            # Publish
             html        = build_html(content, images, story)
             category_id = get_wp_category_id(category["slug"])
 
-            log.info("  🚀 Publishing to WordPress...")
+            log.info("  🚀 Publishing...")
             post_url = publish_to_wordpress(seo_title, html, category_id, featured_id)
 
             if post_url:
@@ -702,15 +669,13 @@ def run():
                     "images":   len(images),
                 })
             else:
-                log.error(f"  ✗ Publish failed for {category['name']}")
                 skipped += 1
 
         except Exception as e:
             log.error(f"  ✗ Unexpected error in {category['name']}: {e}", exc_info=True)
             skipped += 1
-            continue  # Always move to next category
+            continue
 
-    # Final report
     log.info(f"\n{'='*60}")
     log.info(f"  COMPLETED — {published}/5 published | {skipped}/5 skipped")
     log.info(f"{'='*60}")
@@ -720,7 +685,6 @@ def run():
         log.info(f"    🔗 {r['url']}")
     log.info("="*60)
 
-    # Exit with error code if nothing published (alerts GitHub Actions)
     if published == 0:
         raise SystemExit("No articles published — check logs for details")
 
