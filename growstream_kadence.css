@@ -1,0 +1,444 @@
+/*
+ * GrowStream Media — Kadence Custom CSS
+ * Paste this into: Appearance → Customize → Additional CSS
+ * Theme: Kadence | Style: Clean Editorial Finance News
+ */
+
+/* ─────────────────────────────────────────────
+   1. FONTS & VARIABLES
+───────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
+
+:root {
+  --gs-navy: #0d1b2a;
+  --gs-accent: #0ea5e9;
+  --gs-gold: #f59e0b;
+  --gs-text: #1e293b;
+  --gs-muted: #64748b;
+  --gs-border: #e2e8f0;
+  --gs-bg: #f8fafc;
+  --gs-white: #ffffff;
+  --gs-tag-bg: #eff6ff;
+  --gs-display: 'Playfair Display', Georgia, serif;
+  --gs-body: 'Source Sans 3', system-ui, sans-serif;
+  --gs-mono: 'JetBrains Mono', monospace;
+}
+
+/* ─────────────────────────────────────────────
+   2. GLOBAL BASE
+───────────────────────────────────────────── */
+body {
+  font-family: var(--gs-body) !important;
+  background: var(--gs-bg) !important;
+  color: var(--gs-text) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─────────────────────────────────────────────
+   3. HEADER / NAVIGATION
+───────────────────────────────────────────── */
+.site-header,
+.site-header .kadence-sticky-header {
+  background: var(--gs-white) !important;
+  border-bottom: 1px solid var(--gs-border) !important;
+  box-shadow: 0 1px 12px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Logo */
+.site-branding .site-title,
+.site-branding .site-title a {
+  font-family: var(--gs-display) !important;
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  color: var(--gs-navy) !important;
+  letter-spacing: -0.5px !important;
+}
+
+/* Nav links */
+.main-navigation a,
+#main-nav a {
+  font-family: var(--gs-body) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.8px !important;
+  color: var(--gs-muted) !important;
+  padding: 6px 12px !important;
+  border-radius: 6px !important;
+  transition: all 0.15s ease !important;
+}
+
+.main-navigation a:hover,
+#main-nav a:hover,
+.main-navigation .current-menu-item>a {
+  color: var(--gs-navy) !important;
+  background: var(--gs-tag-bg) !important;
+}
+
+/* ─────────────────────────────────────────────
+   4. TICKER BAR (add via widget/header area)
+───────────────────────────────────────────── */
+.gs-ticker {
+  background: var(--gs-navy);
+  color: #94a3b8;
+  font-family: var(--gs-mono);
+  font-size: 11px;
+  padding: 7px 0;
+  overflow: hidden;
+}
+
+.gs-ticker-inner {
+  display: flex;
+  gap: 48px;
+  animation: gsTicker 30s linear infinite;
+  white-space: nowrap;
+  width: max-content;
+}
+
+@keyframes gsTicker {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.gs-ticker .up {
+  color: #34d399;
+  font-weight: 600;
+}
+
+.gs-ticker .down {
+  color: #f87171;
+  font-weight: 600;
+}
+
+/* ─────────────────────────────────────────────
+   5. POST / ARTICLE CARDS
+───────────────────────────────────────────── */
+.entry-card,
+article.type-post,
+.kadence-blocks-post-grid article {
+  background: var(--gs-white) !important;
+  border: 1px solid var(--gs-border) !important;
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  transition: box-shadow 0.2s ease, transform 0.2s ease !important;
+  box-shadow: none !important;
+}
+
+.entry-card:hover,
+article.type-post:hover,
+.kadence-blocks-post-grid article:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.09) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Card thumbnails */
+.entry-card .post-thumbnail img,
+article.type-post .post-thumbnail img,
+.kadence-blocks-post-grid .post-thumbnail img {
+  width: 100% !important;
+  height: 180px !important;
+  object-fit: cover !important;
+  display: block !important;
+  border-radius: 0 !important;
+}
+
+/* Card body padding */
+.entry-card .entry-content,
+.entry-card .entry-summary,
+.kadence-blocks-post-grid .entry-content {
+  padding: 16px !important;
+}
+
+/* ─────────────────────────────────────────────
+   6. POST TITLES
+───────────────────────────────────────────── */
+h1.entry-title,
+h2.entry-title,
+h3.entry-title,
+.entry-title a {
+  font-family: var(--gs-display) !important;
+  font-weight: 800 !important;
+  color: var(--gs-navy) !important;
+  letter-spacing: -0.4px !important;
+  line-height: 1.25 !important;
+  transition: color 0.15s !important;
+}
+
+h1.entry-title {
+  font-size: 32px !important;
+}
+
+h2.entry-title {
+  font-size: 20px !important;
+}
+
+h3.entry-title {
+  font-size: 16px !important;
+}
+
+.entry-title a:hover {
+  color: var(--gs-accent) !important;
+}
+
+/* ─────────────────────────────────────────────
+   7. SINGLE POST / ARTICLE CONTENT
+───────────────────────────────────────────── */
+.entry-content p {
+  font-family: var(--gs-body) !important;
+  font-size: 17px !important;
+  line-height: 1.75 !important;
+  color: var(--gs-text) !important;
+  margin-bottom: 1.4em !important;
+}
+
+.entry-content h2 {
+  font-family: var(--gs-display) !important;
+  font-size: 24px !important;
+  font-weight: 800 !important;
+  color: var(--gs-navy) !important;
+  margin: 2em 0 0.75em !important;
+  padding-bottom: 8px !important;
+  border-bottom: 2px solid var(--gs-border) !important;
+}
+
+.entry-content h3 {
+  font-family: var(--gs-display) !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  color: var(--gs-navy) !important;
+  margin: 1.5em 0 0.6em !important;
+}
+
+.entry-content h4 {
+  font-family: var(--gs-body) !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: var(--gs-navy) !important;
+  margin: 1em 0 0.4em !important;
+}
+
+/* Bullet lists */
+.entry-content ul {
+  padding-left: 0 !important;
+  list-style: none !important;
+  margin-bottom: 1.4em !important;
+}
+
+.entry-content ul li {
+  font-size: 16px !important;
+  color: var(--gs-text) !important;
+  padding: 6px 0 6px 24px !important;
+  position: relative !important;
+  border-bottom: 1px solid var(--gs-border) !important;
+}
+
+.entry-content ul li::before {
+  content: '▸' !important;
+  color: var(--gs-accent) !important;
+  position: absolute !important;
+  left: 0 !important;
+  font-size: 12px !important;
+}
+
+/* ─────────────────────────────────────────────
+   8. CATEGORY TAGS
+───────────────────────────────────────────── */
+.cat-links a,
+.entry-categories a,
+.entry-meta .cat-links a {
+  display: inline-block !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  color: var(--gs-accent) !important;
+  background: var(--gs-tag-bg) !important;
+  padding: 3px 10px !important;
+  border-radius: 4px !important;
+  text-decoration: none !important;
+  margin-bottom: 8px !important;
+}
+
+/* ─────────────────────────────────────────────
+   9. AUTHOR META / POST META
+───────────────────────────────────────────── */
+.entry-meta,
+.post-meta {
+  font-size: 12px !important;
+  color: var(--gs-muted) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+.entry-meta a,
+.post-meta a {
+  color: var(--gs-muted) !important;
+  text-decoration: none !important;
+  font-weight: 600 !important;
+}
+
+.entry-meta a:hover {
+  color: var(--gs-accent) !important;
+}
+
+/* ─────────────────────────────────────────────
+   10. FEATURED IMAGE (single post)
+───────────────────────────────────────────── */
+.post-thumbnail.featured-image img,
+.single .post-thumbnail img {
+  width: 100% !important;
+  aspect-ratio: 16 / 9 !important;
+  height: auto !important;
+  object-fit: contain !important;
+  background-color: var(--gs-navy) !important;
+  border-radius: 12px !important;
+  margin-bottom: 28px !important;
+}
+
+/* Figure captions */
+.wp-block-image figcaption,
+.wp-caption-text,
+figure figcaption {
+  font-size: 13px !important;
+  color: var(--gs-muted) !important;
+  text-align: center !important;
+  padding: 8px 0 !important;
+  font-style: normal !important;
+  line-height: 1.5 !important;
+  border-top: 1px solid var(--gs-border) !important;
+  margin-top: 4px !important;
+}
+
+/* ─────────────────────────────────────────────
+   11. INLINE IMAGES
+───────────────────────────────────────────── */
+.entry-content figure,
+.entry-content .wp-block-image {
+  margin: 28px 0 !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+.entry-content figure img,
+.entry-content .wp-block-image img {
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 8px !important;
+  display: block !important;
+}
+
+/* ─────────────────────────────────────────────
+   12. SIDEBAR (if used)
+───────────────────────────────────────────── */
+.widget-title {
+  font-family: var(--gs-body) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 2px !important;
+  text-transform: uppercase !important;
+  color: var(--gs-muted) !important;
+  padding-bottom: 10px !important;
+  border-bottom: 2px solid var(--gs-accent) !important;
+  margin-bottom: 16px !important;
+}
+
+/* ─────────────────────────────────────────────
+   13. FOOTER
+───────────────────────────────────────────── */
+.site-footer {
+  background: var(--gs-navy) !important;
+  color: #64748b !important;
+  border-top: none !important;
+}
+
+.site-footer a {
+  color: #475569 !important;
+  text-decoration: none !important;
+  transition: color 0.15s !important;
+}
+
+.site-footer a:hover {
+  color: var(--gs-accent) !important;
+}
+
+.site-footer .site-info {
+  font-size: 13px !important;
+}
+
+/* ─────────────────────────────────────────────
+   14. BUTTONS & LINKS
+───────────────────────────────────────────── */
+.wp-block-button__link,
+.button,
+.btn {
+  background: var(--gs-accent) !important;
+  color: white !important;
+  border-radius: 7px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  border: none !important;
+  padding: 10px 22px !important;
+  transition: background 0.15s !important;
+}
+
+.wp-block-button__link:hover,
+.button:hover {
+  background: #0284c7 !important;
+}
+
+a {
+  color: var(--gs-accent) !important;
+}
+
+a:hover {
+  color: #0284c7 !important;
+}
+
+/* ─────────────────────────────────────────────
+   15. READING EXPERIENCE (single post wrapper)
+───────────────────────────────────────────── */
+.single .entry-content,
+.page .entry-content {
+  max-width: 720px !important;
+  margin: 0 auto !important;
+}
+
+/* Pull quote / blockquote */
+.entry-content blockquote {
+  border-left: 4px solid var(--gs-accent) !important;
+  background: var(--gs-tag-bg) !important;
+  margin: 24px 0 !important;
+  padding: 16px 20px !important;
+  border-radius: 0 8px 8px 0 !important;
+  font-size: 17px !important;
+  color: var(--gs-navy) !important;
+  font-style: normal !important;
+}
+
+/* ─────────────────────────────────────────────
+   16. MOBILE RESPONSIVE
+───────────────────────────────────────────── */
+@media (max-width: 768px) {
+  h1.entry-title {
+    font-size: 24px !important;
+  }
+
+  h2.entry-title {
+    font-size: 18px !important;
+  }
+
+  .entry-content p {
+    font-size: 16px !important;
+  }
+
+  .single .post-thumbnail img {
+    height: 220px !important;
+  }
+}
