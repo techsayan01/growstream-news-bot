@@ -17,6 +17,14 @@ env/
 # Logs
 *.log
 
+# Databases (per-site SQLite files)
+data/*.db
+growstream.db
+growstream/growstream.db
+
+# Legacy social dedup state
+growstream/social_posted.json
+
 # IDE
 .vscode/
 .idea/

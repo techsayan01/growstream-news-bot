@@ -20,7 +20,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install anthropic feedparser requests httpx[http2]
+        run: pip install anthropic feedparser requests httpx[http2] python-dotenv json-repair
 
       - name: Test Anthropic API connectivity
         env:
@@ -44,8 +44,9 @@ jobs:
           CLAUDE_API_KEY:   ${{ secrets.CLAUDE_API_KEY }}
           WP_USERNAME:      ${{ secrets.WP_USERNAME }}
           WP_PASSWORD:      ${{ secrets.WP_PASSWORD }}
+          WP_API_KEY:       ${{ secrets.WP_API_KEY }}
           UNSPLASH_API_KEY: ${{ secrets.UNSPLASH_API_KEY }}
-        run: python news_bot_production.py
+        run: python run.py --site growstreammedia --pipeline daily_news
 
       - name: Upload logs on failure
         if: failure()

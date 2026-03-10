@@ -1,189 +1,293 @@
-# GrowStream News Bot
+# News Bot — Multi-Site Multi-Agent Content Automation
 
-An autonomous multi-agent news bot that researches, writes, edits, and publishes AI finance articles to WordPress — daily, weekly, and monthly.
-
----
-
-## How It Works
-
-Each pipeline runs a team of five AI agents in sequence:
-
-| Agent | Name | Role | Model |
-|---|---|---|---|
-| 1 | **Alex Rivera** | RSS Research | — |
-| 2 | **Dr. Sarah Chen** | Story Ranking & Picking | Claude Sonnet |
-| 3 | **Marcus Webb** | Fact-Check Gate | Claude Sonnet |
-| 4 | **Jordan Blake** | Article Writer | Claude Haiku / Sonnet |
-| 5 | **Priya Sharma** | SEO & Quality Editor | Claude Sonnet |
+An autonomous AI publishing system that sources, researches, writes, edits, and publishes articles using a team of 5 specialized Claude agents. Designed to run for **multiple websites** with full segregation of site configs, social posting, and pipeline types.
 
 ---
 
-## Pipelines
+## Architecture Overview
 
-### Daily — Main News (`python main.py`)
-The flagship pipeline. Runs across 5 WordPress categories: AI in Banking, Fintech News, Investment AI, Regulatory Updates, Tool Reviews.
-
-**Flow per category:**
-1. Alex fetches RSS stories → Sarah ranks top 3 → Marcus fact-checks
-2. Duplicate check against WordPress (last 7 days by focus keyword)
-3. Jordan writes the article → Priya reviews (up to 3 revision passes)
-4. Published to WordPress with deduplicated Unsplash hero image
-
-**Every article includes:**
-- ⏳ **15 Sec Read** — 3-bullet scannable summary at the top
-- 🏆📉 **Winner / Loser Box** — two-column callout naming the story's clear winner and loser
-- 🌏🌍🌎 **Global Market Angles** — dedicated Asia / Europe / US sub-sections with named companies & regulators
-- 🔄 **The Contrarian Take** — challenges the consensus view
-- Blockquotes for key quotes, bolded financial figures, styled Bottom Line box
-- FAQ section (3 items)
-
-**Headlines** are generated with a contrarian framing strategy:  
-*"Why X Won't Work" / "Everyone's Wrong About X" / "The Real Winner Is..."*
-
----
-
-### Daily — Hot Takes (`python hot_takes.py`)
-One 80–100 word punchy opinion post. No editor review. Just the take.
-
-- Scans all category feeds, Sarah picks the most debate-worthy story
-- Jordan writes in tweet energy — bold claim, 2-3 supporting sentences, one quotable line
-- Published in a dark-styled callout box to the `hot-takes` category
-
----
-
-### Daily — Translated for Humans (`python translated.py`)
-Skips silently if no regulatory story is found.
-
-Finds stories mentioning: *circular, filing, framework, directive, RBI, SEC, ECB, SEBI...*
-
-Publishes in the format **"We Read [Document] So You Don't Have To"** with sections:
-- 📄 What They Said (mocking the bureaucratic tone)
-- 🤔 What It Actually Means (plain English + analogy)
-- ✅ What You Should Actually Do About It (bullet list)
-- 🧐 The Part They Buried (the thing in paragraph 47 that matters)
-- ⚡ The Bottom Line
-
----
-
-### Daily — Follow the Money (`python follow_the_money.py`)
-Skips silently if no funding/M&A story is found.
-
-Triggers on: *raised, million, billion, Series A/B/C, acquired, merger, IPO...*
-
-Publishes an investigative-style piece tracing:
-- Where the money goes (implied allocation breakdown)
-- Who benefits and who doesn't (by name)
-- What the deal signals about market direction
-- Global ripple effect (Asia / Europe / US paragraphs)
-
----
-
-### Weekly — Dumbest Move of the Week (`python dumbest_move.py`)
-Run on Sundays. Publishes Monday.
-
-Sarah picks the most questionable decision by a company, regulator, or executive from the week's news. Jordan writes a 300–400 word humorous accountability piece with:
-- What happened
-- What they were probably thinking (charitable reading)
-- Why it backfired
-- What they should have done instead
-- A-F grade + *"Better luck next week."*
-
----
-
-### Monthly — Leaderboards & Rankings (`python leaderboards.py`)
-Run on the 1st of each month.
-
-Auto-selects a rotating topic from 12 themes (AI bank features, funding rounds, regulatory moves, M&A activity, etc.). Publishes a styled **Top 10** ranked list with opinionated commentary per entry and a month-in-one-sentence takeaway.
-
----
-
-## Setup
-
-### Requirements
 ```
-python 3.11+
-pip install -r requirements.txt
+run.py                      ← Unified CLI entry point (--site, --pipeline)
+├── sites/                  ← One sub-package per website
+│   ├── base.py             ← SiteConfig dataclass
+│   └── growstreammedia/
+│       ├── config.py       ← Credentials + SiteConfig instance
+│       └── feeds.py        ← RSS feeds + content categories
+├── agents/                 ← AI agent logic (generic, reusable across sites)
+│   ├── researcher.py       ← Agent 1: RSS fetching (Alex Rivera)
+│   ├── ranker.py           ← Agent 2: Story ranking (Dr. Sarah Chen)
+│   ├── factchecker.py      ← Agent 3: Credibility gate (Marcus Webb)
+│   ├── writer.py           ← Agent 5: Article writing (Jordan Blake)
+│   └── editor.py           ← Agent 4: Editorial review (Priya Sharma)
+├── content/                ← Content utilities
+│   ├── images.py           ← Unsplash image fetching + deduplication
+│   └── seo.py              ← Focus keyword, SEO title, meta description
+├── publishing/             ← Publishing targets
+│   └── wordpress/
+│       ├── client.py       ← WordPress REST API client (per-site instance)
+│       └── html.py         ← HTML builder + JSON-LD schema markup
+├── social/                 ← Social media posting
+│   ├── base.py             ← Abstract SocialPoster interface
+│   ├── copy.py             ← AI-generated platform-specific copy
+│   ├── linkedin.py         ← LinkedIn (company page + personal profile)
+│   ├── twitter.py          ← Twitter/X thread poster
+│   └── facebook.py         ← Facebook Page poster
+├── pipelines/              ← Post type pipelines
+│   ├── base.py             ← Abstract Pipeline base class
+│   ├── daily_news.py       ← Main 5-category daily pipeline
+│   ├── hot_takes.py        ← 80-100 word punchy opinion pieces
+│   ├── translated.py       ← Regulatory plain-English translations
+│   ├── follow_the_money.py ← Investment/funding analysis
+│   ├── dumbest_move.py     ← Weekly accountability piece (Sundays)
+│   ├── leaderboards.py     ← Monthly Top 10 rankings (1st of month)
+│   └── social.py           ← Social media queue processor
+├── core/                   ← Shared infrastructure
+│   ├── llm.py              ← Anthropic client singleton + cost tracking
+│   ├── db.py               ← SQLite database layer (per-site path)
+│   ├── retry.py            ← @with_retry decorator
+│   └── utils.py            ← Logging, safe_json_parse
+├── auth/
+│   └── linkedin.py         ← LinkedIn OAuth 2.0 authorization flow
+├── preflight.py            ← Pre-flight health checks (takes SiteConfig)
+└── data/                   ← Per-site SQLite databases (gitignored)
+    └── growstreammedia.db
 ```
 
-### Environment Variables
-Create a `.env` file:
+---
+
+## Quick Start
+
+### 1. Install dependencies
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install anthropic feedparser requests httpx python-dotenv json-repair
+```
+
+### 2. Configure credentials
+
+Create `.env` in the project root:
+
 ```env
-CLAUDE_API_KEY=your_anthropic_api_key
-UNSPLASH_API_KEY=your_unsplash_api_key
-WP_URL=https://your-site.com
-WP_USERNAME=your_wp_username
-WP_PASSWORD=your_wp_application_password
+# Required (global)
+CLAUDE_API_KEY=sk-ant-...
+UNSPLASH_API_KEY=...
+
+# Required (GrowStream Media site)
+WP_URL=https://growstreammedia.com
+WP_USERNAME=newsbot
+WP_PASSWORD=your-app-password
+
+# Optional — LinkedIn social posting
+LINKEDIN_CLIENT_ID=...
+LINKEDIN_CLIENT_SECRET=...
+LINKEDIN_ACCESS_TOKEN=...
+LINKEDIN_ORG_URN=urn:li:organization:...
+LINKEDIN_PERSON_URN=urn:li:person:...
+
+# Optional — Twitter/X
+TWITTER_API_KEY=...
+TWITTER_API_SECRET=...
+TWITTER_ACCESS_TOKEN=...
+TWITTER_ACCESS_SECRET=...
+
+# Optional — Facebook
+FB_PAGE_ID=...
+FB_PAGE_ACCESS_TOKEN=...
 ```
 
-### WordPress Setup
-- Enable the REST API (on by default in WordPress)
-- Generate an **Application Password** under Users → Profile
-- The bot will **auto-create** all required categories on first run
+### 3. Run
 
----
+```bash
+# Full CLI
+python run.py --site growstreammedia --pipeline daily_news
 
-## Cron Schedule (Recommended)
+# Shortcut aliases (backward-compatible)
+python main.py            # daily_news
+python hot_takes.py
+python translated.py
+python follow_the_money.py
+python dumbest_move.py
+python leaderboards.py
+python social.py                               # process pending queue
+python social.py https://site.com/article/    # force-post a URL
 
-```cron
-# Daily — 6:00 AM IST
-0 30 0 * * * cd /path/to/bot && source venv/bin/activate && python main.py
-0 45 0 * * * cd /path/to/bot && source venv/bin/activate && python hot_takes.py
-0 0 1 * * * cd /path/to/bot && source venv/bin/activate && python translated.py
-0 15 1 * * * cd /path/to/bot && source venv/bin/activate && python follow_the_money.py
-
-# Weekly — Every Sunday 11 PM IST (publishes Monday)
-0 30 17 * * 0 cd /path/to/bot && source venv/bin/activate && python dumbest_move.py
-
-# Monthly — 1st of month, 4 AM IST
-0 30 22 28-31 * * [ "$(date +\%d)" = "01" ] && cd /path/to/bot && source venv/bin/activate && python leaderboards.py
-```
-
----
-
-## Project Structure
-
-```
-growstream-news-bot/
-├── main.py                        # Daily news entry point
-├── hot_takes.py                   # Hot Takes entry point
-├── translated.py                  # Translated for Humans entry point
-├── follow_the_money.py            # Follow the Money entry point
-├── dumbest_move.py                # Dumbest Move entry point
-├── leaderboards.py                # Leaderboards entry point
-│
-├── growstream/
-│   ├── agents.py                  # Sarah Chen, Marcus Webb, Priya Sharma
-│   ├── config.py                  # Env, logging, retry decorator, JSON utils
-│   ├── feeds.py                   # Alex Rivera — RSS feeds & research agent
-│   ├── images.py                  # Unsplash image fetching (deduped, shuffled)
-│   ├── pipeline.py                # Main daily pipeline orchestrator
-│   ├── preflight.py               # Startup checks (API keys, WP connectivity)
-│   ├── publisher.py               # WordPress REST API — publish, images, categories
-│   ├── seo.py                     # Jordan Blake — writer, SEO title, meta, keyword
-│   │
-│   └── pipelines/
-│       ├── hot_takes.py
-│       ├── translated.py
-│       ├── follow_the_money.py
-│       ├── dumbest_move.py
-│       └── leaderboards.py
-│
-└── .env
+# Developer flags
+python run.py --site growstreammedia --pipeline daily_news --skip-preflight
 ```
 
 ---
 
-## Content Features
+## Adding a New Website
 
-| Feature | Where |
-|---|---|
-| 15 Sec Read summary box | Every article (top) |
-| Winner / Loser callout box | Every article (below summary) |
-| Global Market Angles (Asia/EU/US) | Every article |
-| The Contrarian Take section | Every article |
-| Contrarian headline framing | All SEO titles |
-| Sharp editorial voice (Jordan Blake) | All written content |
-| Image deduplication (7-day lookback) | All pipelines |
-| Article deduplication (focus keyword) | Main pipeline |
-| Fallback to Top 3 stories | Main pipeline |
-| Auto-create WP categories | All specialist pipelines |
+### Step 1 — Create the site package
+
+```bash
+mkdir -p sites/mynewsite
+touch sites/mynewsite/__init__.py
+```
+
+### Step 2 — `sites/mynewsite/feeds.py`
+
+```python
+CATEGORY_FEEDS = {
+    "my-category": ["https://rss.example.com/feed/"],
+}
+FALLBACK_FEEDS = ["https://rss.example.com/all/"]
+CATEGORIES = [
+    {
+        "slug":        "my-category",
+        "name":        "My Category",
+        "keywords":    ["keyword1", "keyword2"],
+        "image_style": "technology business",
+        "author_id":   1,
+    },
+]
+```
+
+### Step 3 — `sites/mynewsite/config.py`
+
+```python
+import os
+from sites.base import SiteConfig
+from sites.mynewsite.feeds import CATEGORIES, CATEGORY_FEEDS, FALLBACK_FEEDS
+
+SITE = SiteConfig(
+    name="mynewsite",
+    display_name="My New Site",
+    site_url="https://mynewsite.com",
+    wp_url=os.environ.get("MYNEWSITE_WP_URL", "https://mynewsite.com"),
+    wp_username=os.environ.get("MYNEWSITE_WP_USERNAME", ""),
+    wp_password=os.environ.get("MYNEWSITE_WP_PASSWORD", ""),
+    categories=CATEGORIES,
+    category_feeds=CATEGORY_FEEDS,
+    fallback_feeds=FALLBACK_FEEDS,
+    db_path="data/mynewsite.db",
+    linkedin_access_token=os.environ.get("MYNEWSITE_LINKEDIN_TOKEN", ""),
+)
+```
+
+### Step 4 — Register in `run.py`
+
+```python
+def _load_sites():
+    from sites.growstreammedia.config import SITE as growstreammedia
+    from sites.mynewsite.config import SITE as mynewsite
+    return {
+        "growstreammedia": growstreammedia,
+        "mynewsite": mynewsite,
+    }
+```
+
+### Step 5 — Run
+
+```bash
+python run.py --site mynewsite --pipeline daily_news
+```
+
+Each site gets its own isolated database at `data/<sitename>.db`. No credentials, feeds, or DB state are shared between sites.
+
+---
+
+## Agent Roles
+
+| Agent | Persona | Model | Role |
+|-------|---------|-------|------|
+| 1 | Alex Rivera | — | RSS research & story fetching |
+| 2 | Dr. Sarah Chen | Sonnet | Story ranking by market relevance + virality |
+| 3 | Marcus Webb | Sonnet | Fact-check & credibility gate |
+| 4 | Priya Sharma | Sonnet | Editorial review (SEO + quality gate) |
+| 5 | Jordan Blake | Haiku / Sonnet | Article writing + revision passes |
+
+---
+
+## Pipeline Types
+
+| Pipeline | Recommended Schedule | Description |
+|----------|---------------------|-------------|
+| `daily_news` | Daily | 5 full-length articles across all categories |
+| `hot_takes` | Daily | 80-100 word punchy opinion piece |
+| `translated` | Daily | Plain-English breakdown of regulatory documents |
+| `follow_the_money` | Daily | Investigative funding/investment analysis |
+| `dumbest_move` | Weekly (Sunday) | Humorous accountability piece |
+| `leaderboards` | Monthly (1st) | Top 10 ranked list on rotating monthly theme |
+| `social` | Post-publish | LinkedIn / X / Facebook queue processor |
+
+---
+
+## Social Media Architecture
+
+Each platform is a class instantiated with credentials from `SiteConfig`:
+
+```python
+# social/linkedin.py
+class LinkedInPoster(SocialPoster):
+    def __init__(self, access_token, org_urn, person_urn, ...): ...
+    def post(self, copy, post, db_row=None): ...
+
+# social/twitter.py
+class TwitterPoster(SocialPoster): ...
+
+# social/facebook.py
+class FacebookPoster(SocialPoster): ...
+```
+
+The `SocialPipeline` instantiates all configured platforms and runs them. Platforms with empty credentials are skipped gracefully.
+
+---
+
+## Database Schema
+
+Each site gets its own SQLite database at `data/<sitename>.db`:
+
+| Table | Purpose |
+|-------|---------|
+| `raw_stories` | Fetched RSS stories (deduplication by URL) |
+| `published_articles` | Published post log + Unsplash image deduplication |
+| `social_queue` | Pending / published / failed social posts per platform |
+| `llm_metrics` | Token usage and estimated cost per agent call |
+
+---
+
+## LinkedIn OAuth Setup
+
+```bash
+python auth/linkedin.py
+# Copy the printed LINKEDIN_ACCESS_TOKEN into your .env
+```
+
+Tokens expire after ~60 days. Re-run to refresh.
+
+---
+
+## GitHub Actions
+
+Daily schedule via `.github/workflows/news_bot_production.yml` (2:00 AM UTC = 7:30 AM IST):
+
+```yaml
+schedule:
+  - cron: '0 2 * * *'
+```
+
+Required GitHub Secrets: `CLAUDE_API_KEY`, `WP_USERNAME`, `WP_PASSWORD`, `UNSPLASH_API_KEY`
+
+---
+
+## Cost Estimate
+
+| Scope | Approx. Cost |
+|-------|-------------|
+| Per article | ~$0.03 |
+| Per day (5 articles) | ~$0.15 |
+| Per month | ~$4.50 |
+
+---
+
+## Design Principles
+
+- **Site isolation** — Each `SiteConfig` carries its own WP credentials, feeds, categories, social tokens, and DB path. Two sites never share state.
+- **Generic agents** — Agent functions receive feeds/categories as parameters, never importing site-specific globals.
+- **Classed publishers & social posters** — `WordPressClient`, `LinkedInPoster`, etc. are instantiated per-site, making it safe to run multiple sites in the same process.
+- **Global infrastructure** — `CLAUDE_API_KEY` and `UNSPLASH_API_KEY` are the only truly global values (same API, same billing).
+- **Preflight first** — No LLM tokens are spent until all services are confirmed reachable.
