@@ -89,7 +89,7 @@ def _check_anthropic() -> CheckResult:
         elif "timeout" in err.lower() or "connection" in err.lower():
             msg = "Network timeout"
         else:
-            msg = err[:80]
+            msg = err
         return CheckResult("Anthropic API", False, msg)
 
 
@@ -113,15 +113,32 @@ def _check_unsplash() -> CheckResult:
 
 
 def _check_wordpress(site: SiteConfig) -> CheckResult:
-    """Verify WordPress access using API key (preferred) or Basic Auth."""
+    """Verify WordPress access: API key → JWT → fail."""
     if getattr(site, "wp_api_key", ""):
-        auth_header = {"X-Newsbot-Key": site.wp_api_key}
+        auth_header  = {"X-Newsbot-Key": site.wp_api_key}
         method_label = "API key"
     else:
-        import base64
-        token       = base64.b64encode(f"{site.wp_username}:{site.wp_password}".encode()).decode()
-        auth_header = {"Authorization": f"Basic {token}"}
-        method_label = "Basic Auth"
+        # Obtain JWT token
+        try:
+            r = requests.post(
+                f"{site.wp_url}/wp-json/jwt-auth/v1/token",
+                json={"username": site.wp_username, "password": site.wp_password},
+                timeout=REQUEST_TIMEOUT,
+            )
+            if r.status_code in (401, 403):
+                msg = r.json().get("message", "wrong credentials") if r.content else f"HTTP {r.status_code}"
+                return CheckResult("WordPress API", False, f"JWT auth failed: {msg}")
+            if r.status_code != 200:
+                return CheckResult("WordPress API", False, f"JWT endpoint returned {r.status_code}")
+            token = r.json().get("token")
+            if not token:
+                return CheckResult("WordPress API", False, "JWT response missing token field")
+        except requests.exceptions.ConnectionError:
+            return CheckResult("WordPress API", False, f"Cannot reach {site.wp_url}")
+        except Exception as e:
+            return CheckResult("WordPress API", False, str(e)[:80])
+        auth_header  = {"Authorization": f"Bearer {token}"}
+        method_label = "JWT"
     try:
         me = requests.get(
             f"{site.wp_url}/wp-json/wp/v2/users/me",
@@ -132,7 +149,7 @@ def _check_wordpress(site: SiteConfig) -> CheckResult:
         if me.status_code in (401, 403):
             return CheckResult(
                 "WordPress API", False,
-                f"Application Password auth failed ({me.status_code}) — check WP_USERNAME / WP_PASSWORD"
+                f"Auth rejected on /users/me ({me.status_code}) — token may be invalid"
             )
         if me.status_code != 200:
             return CheckResult("WordPress API", False, f"/users/me returned {me.status_code}")

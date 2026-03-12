@@ -69,7 +69,30 @@ class SocialPipeline(Pipeline):
 
     def _process_post(self, post: dict, db_row=None) -> None:
         log.info(f"  ✓ Article: '{post['title']['rendered'][:60]}...'")
-        log.info("  ✍ Generating social copy…")
+
+        # Auth preflight — only generate AI copy if at least one platform is reachable
+        platforms = [
+            ("LinkedIn",  self.linkedin),
+            ("X",         self.twitter),
+            ("Facebook",  self.facebook),
+        ]
+        viable = []
+        for name, poster in platforms:
+            if poster is None:
+                log.info(f"  ⏭ {name}: not configured")
+                continue
+            ok, msg = poster.check_auth()
+            if ok:
+                viable.append(name)
+                log.info(f"  ✓ {name}: {msg}")
+            else:
+                log.warning(f"  ⚠ {name}: {msg} — skipping")
+
+        if not viable:
+            log.error("  ✗ No social platforms available — skipping AI copy generation")
+            return
+
+        log.info(f"  ✍ Generating social copy for {', '.join(viable)}…")
         copy = generate_social_copy(post)
 
         log.info("\n  📤 Publishing to platforms…")

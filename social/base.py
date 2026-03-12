@@ -11,6 +11,13 @@ class SocialPoster(ABC):
         """Post *copy* for a WordPress *post*. Returns a result identifier or None."""
         ...
 
+    @abstractmethod
+    def check_auth(self) -> tuple[bool, str]:
+        """Verify credentials with a lightweight API call.
+        Returns (ok, message) — never raises.
+        """
+        ...
+
     @property
     @abstractmethod
     def platform(self) -> str:

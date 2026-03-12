@@ -16,7 +16,7 @@ try:
         Path(__file__).parent.parent.parent / "growstream" / ".env",
     ]:
         if _p.exists():
-            load_dotenv(dotenv_path=_p, override=False)
+            load_dotenv(dotenv_path=_p, override=True)
             break
 except ImportError:
     pass

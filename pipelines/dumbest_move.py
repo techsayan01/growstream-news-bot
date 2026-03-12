@@ -53,7 +53,7 @@ Return ONLY JSON:
 }}"""
 
     r = get_client().messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-haiku-4-5-20251001",
         max_tokens=300,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -112,7 +112,7 @@ Decision maker: {decision_maker}
 What they did: {story.get('_dm_what', '')}"""
 
     r = get_client().messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=1500,
         messages=[{"role": "user", "content": prompt}],
     )

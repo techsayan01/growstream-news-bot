@@ -1,7 +1,7 @@
 """
 Agent 2 — Story Ranking (Dr. Sarah Chen, Chief Market Intelligence Analyst).
 
-Scores stories by market relevance and virality, returns the top 3.
+Scores stories by market relevance and virality, returns the top 5.
 """
 
 import json
@@ -22,7 +22,7 @@ You have zero patience for PR fluff, incremental product updates, or hype withou
 
 @with_retry(max_retries=3, delay=5)
 def rank_stories(stories: list[dict], category: dict) -> list[dict] | None:
-    """Rank *stories* and return the top 3 for *category*."""
+    """Rank *stories* and return the top 5 for *category*."""
     log.info(f"📊 [Agent 2 — Dr. Sarah Chen] Ranking {len(stories)} stories for {category['name']}")
 
     stories_json = json.dumps(
@@ -46,7 +46,7 @@ Scoring criteria:
 Stories to evaluate:
 {stories_json}
 
-Select the TOP 3 best stories in order of relevance/virality. Return ONLY this JSON format (no markdown, no commentary):
+Select the TOP 5 best stories in order of relevance/virality. Return ONLY this JSON format (no markdown, no commentary):
 {{
   "top_stories": [
     {{
@@ -65,7 +65,7 @@ Select the TOP 3 best stories in order of relevance/virality. Return ONLY this J
 }}"""
 
     response = get_client().messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-haiku-4-5-20251001",
         max_tokens=1500,
         messages=[{"role": "user", "content": prompt}],
     )

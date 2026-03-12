@@ -112,7 +112,7 @@ def write_article(
 
     if editor_notes and previous_article:
         log.info("  ✍️  Jordan Blake is revising based on editor feedback (Sonnet)…")
-        model  = "claude-sonnet-4-20250514"
+        model  = "claude-sonnet-4-6"
         prompt = f"""{PERSONA}
 
 ⚠️ REVISION BRIEFING FROM PRIYA SHARMA (Managing Editor):
@@ -159,7 +159,7 @@ Return ONLY the article HTML body."""
 
     response = get_client().messages.create(
         model=model,
-        max_tokens=2500,
+        max_tokens=4096,
         messages=[{"role": "user", "content": prompt}],
     )
     content = response.content[0].text.strip()

@@ -6,8 +6,6 @@ Feed URLs and fallback feeds are supplied by the caller (from SiteConfig),
 keeping this module site-agnostic.
 """
 
-import random
-
 import feedparser
 
 from core.db import is_story_processed, store_raw_story
@@ -46,7 +44,8 @@ def research_agent(
             seen.add(key)
             unique.append(s)
 
-    random.shuffle(unique)
+    # Sort by summary length (richer summaries → better article candidates)
+    unique.sort(key=lambda s: len(s.get("summary", "")), reverse=True)
     result = unique[:10]
     log.info(f"  ✓ {len(result)} unique stories found")
     return result or None

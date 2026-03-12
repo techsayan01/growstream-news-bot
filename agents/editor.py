@@ -6,6 +6,7 @@ Returns approval + actionable feedback for revision loops.
 """
 
 import json
+import re
 
 from core.llm import get_client
 from core.retry import with_retry
@@ -45,7 +46,7 @@ def review_article(
     """
     log.info(f"📝 [Agent 4 — Priya Sharma] Editing article for {category['name']}")
 
-    article_preview = article_html[:20000]
+    article_preview = re.sub(r"<[^>]+>", " ", article_html)[:6000]
 
     prompt = f"""{_PERSONA}
 
@@ -101,8 +102,8 @@ Rules:
 - If rewrites_needed, editorial_notes MUST contain specific, actionable instructions"""
 
     response = get_client().messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=600,
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1200,
         messages=[{"role": "user", "content": prompt}],
     )
     result = safe_json_parse(response.content[0].text)

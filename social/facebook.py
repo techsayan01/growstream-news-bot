@@ -22,6 +22,23 @@ class FacebookPoster(SocialPoster):
     def platform(self) -> str:
         return "facebook"
 
+    def check_auth(self) -> tuple[bool, str]:
+        if not self.page_access_token or not self.page_id:
+            return False, "No credentials configured"
+        try:
+            r = requests.get(
+                f"https://graph.facebook.com/v19.0/{self.page_id}",
+                params={"fields": "id,name", "access_token": self.page_access_token},
+                timeout=10,
+            )
+            if r.status_code == 200:
+                name = r.json().get("name", self.page_id)
+                return True, f"Authenticated as '{name}'"
+            err = r.json().get("error", {}).get("message", f"HTTP {r.status_code}")
+            return False, err[:80]
+        except Exception as e:
+            return False, str(e)[:60]
+
     def post(self, copy: dict, post: dict, db_row=None):
         if db_row and db_row["facebook_status"] not in ("pending", "failed"):
             log.info("  ⏭ Facebook: not pending — skipping")

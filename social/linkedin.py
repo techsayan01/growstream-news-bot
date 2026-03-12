@@ -35,6 +35,50 @@ class LinkedInPoster(SocialPoster):
     def platform(self) -> str:
         return "linkedin"
 
+    def check_auth(self) -> tuple[bool, str]:
+        if not self.access_token or self.access_token == "your_access_token_here":
+            return False, "No access token configured"
+
+        def _verify(token: str) -> tuple[bool, str]:
+            try:
+                r = requests.get(
+                    "https://api.linkedin.com/v2/userinfo",
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=10,
+                )
+                if r.status_code == 200:
+                    name = r.json().get("name", "unknown")
+                    return True, f"Authenticated as '{name}'"
+                elif r.status_code == 401:
+                    return False, "expired"
+                elif r.status_code == 403:
+                    return False, "Token lacks required scope (403)"
+                return False, f"Auth check returned {r.status_code}"
+            except Exception as e:
+                return False, f"Unreachable: {str(e)[:60]}"
+
+        ok, msg = _verify(self.access_token)
+        if ok:
+            return True, msg
+
+        if msg == "expired":
+            # Try silent auto-refresh before giving up
+            log.info("  🔄 LinkedIn token expired — attempting silent refresh…")
+            try:
+                from auth.linkedin import try_auto_refresh
+                new_token = try_auto_refresh()
+                if new_token:
+                    self.access_token = new_token
+                    ok2, msg2 = _verify(new_token)
+                    if ok2:
+                        log.info("  ✓ LinkedIn token refreshed automatically")
+                        return True, msg2 + " (auto-refreshed)"
+            except Exception as e:
+                log.warning(f"  ⚠ Auto-refresh failed: {e}")
+            return False, "Token expired or revoked — run: python auth/linkedin.py --refresh"
+
+        return False, msg
+
     @with_retry(max_retries=2, delay=5)
     def post(self, copy: dict, post: dict, db_row=None):
         if db_row and db_row["linkedin_status"] not in ("pending", "failed"):

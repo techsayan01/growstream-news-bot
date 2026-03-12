@@ -28,6 +28,26 @@ class TwitterPoster(SocialPoster):
     def platform(self) -> str:
         return "twitter"
 
+    def check_auth(self) -> tuple[bool, str]:
+        if not self.api_key:
+            return False, "No credentials configured"
+        try:
+            import tweepy
+            client = tweepy.Client(
+                consumer_key=self.api_key,
+                consumer_secret=self.api_secret,
+                access_token=self.access_token,
+                access_token_secret=self.access_secret,
+            )
+            me = client.get_me()
+            if me.data:
+                return True, f"Authenticated as @{me.data.username}"
+            return False, "Could not verify credentials"
+        except ImportError:
+            return False, "tweepy not installed"
+        except Exception as e:
+            return False, str(e)[:80]
+
     def post(self, copy: dict, post: dict, db_row=None):
         if db_row and db_row["twitter_status"] not in ("pending", "failed"):
             log.info("  ⏭ X: not pending — skipping")

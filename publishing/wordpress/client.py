@@ -5,7 +5,7 @@ Instantiate one WordPressClient per site using credentials from SiteConfig.
 All API calls (Application Password auth, category lookup, image upload, post creation) live here.
 """
 
-import json
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -27,36 +27,61 @@ class WordPressClient(Publisher):
     """
 
     def __init__(self, wp_url: str, username: str, password: str, api_key: str = ""):
-        self.wp_url   = wp_url.rstrip("/")
-        self.username = username
-        self.password = password
-        self.api_key  = api_key  # preferred; set via WP_API_KEY + mu-plugin
+        self.wp_url    = wp_url.rstrip("/")
+        self.username  = username
+        self.password  = password
+        self.api_key   = api_key   # preferred; set via WP_API_KEY + mu-plugin
+        self._jwt_token: str | None = None
+        self._jwt_lock = threading.Lock()
 
     # ── Authentication ────────────────────────────────────────────────────────
 
     def _auth_header(self) -> dict:
-        """API key header (preferred) or Basic Auth fallback."""
+        """API key (best) → JWT (fallback) → raises if neither works."""
         if self.api_key:
             return {"X-Newsbot-Key": self.api_key}
-        import base64
-        token = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
-        return {"Authorization": f"Basic {token}"}
+        token = self._get_jwt_token()
+        if token:
+            return {"Authorization": f"Bearer {token}"}
+        raise RuntimeError("WordPress auth unavailable — set WP_API_KEY or check WP credentials.")
+
+    def _get_jwt_token(self) -> str | None:
+        with self._jwt_lock:
+            if self._jwt_token:
+                return self._jwt_token
+        try:
+            r = requests.post(
+                f"{self.wp_url}/wp-json/jwt-auth/v1/token",
+                json={"username": self.username, "password": self.password},
+                timeout=REQUEST_TIMEOUT,
+            )
+            r.raise_for_status()
+            self._jwt_token = r.json().get("token")
+            if self._jwt_token:
+                log.info("  ✓ JWT token acquired")
+            else:
+                log.error("  ✗ JWT response missing token field")
+        except Exception as e:
+            log.error(f"  ✗ JWT auth failed: {e}")
+        return self._jwt_token
 
     # ── Deduplication ─────────────────────────────────────────────────────────
 
-    def article_exists(self, query: str) -> bool:
+    def article_exists(self, query: str, days: int = 30) -> bool:
+        """Return True if a post matching *query* was published within *days* days."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 r = requests.get(
                     f"{self.wp_url}/wp-json/wp/v2/posts",
-                    params={"search": query, "per_page": 1},
+                    params={"search": query, "per_page": 1, "after": cutoff},
                     headers=self._auth_header(),
                     timeout=REQUEST_TIMEOUT,
                 )
                 r.raise_for_status()
                 posts = r.json()
                 if posts:
-                    log.warning(f"  ⚠ Article matching '{query}' already exists (ID: {posts[0]['id']})")
+                    log.warning(f"  ⚠ Article matching '{query}' already published in last {days}d (ID: {posts[0]['id']})")
                     return True
                 return False
             except Exception as e:
@@ -130,8 +155,8 @@ class WordPressClient(Publisher):
         try:
             r = requests.post(
                 f"{self.wp_url}/wp-json/wp/v2/categories",
-                headers={**self._auth_header(), "Content-Type": "application/json"},
-                data=json.dumps({"name": name, "slug": slug}),
+                headers=self._auth_header(),
+                json={"name": name, "slug": slug},
                 timeout=REQUEST_TIMEOUT,
             )
             r.raise_for_status()
@@ -190,16 +215,16 @@ class WordPressClient(Publisher):
                     try:
                         requests.post(
                             f"{self.wp_url}/wp-json/wp/v2/media/{media_id}",
-                            headers={**self._auth_header(), "Content-Type": "application/json"},
-                            data=json.dumps({
+                            headers=self._auth_header(),
+                            json={
                                 "alt_text":    alt_text,
                                 "caption":     img_caption,
                                 "title":       title[:80],
                                 "description": (
-                                    f"{focus_keyword} — {title[:100]}"
+                                    f"{focus_keyword} - {title[:100]}"
                                     if focus_keyword else title[:100]
                                 ),
-                            }),
+                            },
                             timeout=15,
                         )
                     except Exception:
@@ -260,8 +285,8 @@ class WordPressClient(Publisher):
 
                 r = requests.post(
                     f"{self.wp_url}/wp-json/wp/v2/posts",
-                    headers={**self._auth_header(), "Content-Type": "application/json"},
-                    data=json.dumps(payload),
+                    headers=self._auth_header(),
+                    json=payload,
                     timeout=30,
                 )
 
