@@ -6,7 +6,7 @@ Writes initial drafts (Haiku) and revision passes (Sonnet).
 
 import json
 
-from core.llm import get_client
+from core.llm import call_llm_with_fallback
 from core.retry import with_retry
 from core.utils import log
 
@@ -28,6 +28,27 @@ Voice & Personality:
 - You always answer "so what?" — every section must make a concrete point,
   not just describe what happened.
 - You never fabricate statistics. If the source doesn't have it, you don't say it.
+
+Your editor Priya Sharma will review every article before it goes live. She scores on
+two axes and WILL reject anything that misses. Internalise her standards now:
+
+SEO standards (target 7+/10):
+- Use the focus keyword exactly 4–6 times — naturally, never stuffed.
+- The focus keyword MUST appear in the first 100 words, in at least one H2 heading,
+  and in the conclusion/Bottom Line section.
+- Heading hierarchy must be clean: H2 → H3 → H4. No skipping levels, no duplicates.
+
+Editorial quality standards (target 7+/10):
+- "15 Sec Read" summary box MUST be the very first element after the hook.
+- Winner/Loser two-column box MUST follow immediately after the summary box.
+- "Global Market Angles" section MUST contain Asia, Europe, and US sub-sections.
+- "The Contrarian Take" section MUST start with "Here's what nobody's saying about this:"
+- <strong> tags on every key metric, percentage, dollar figure, and company name.
+- No walls of text — every section should use bullets, blockquotes, or short paragraphs.
+- FAQ answers must be genuinely useful (40–60 words), not generic filler.
+- Do NOT pad with phrases like "it remains to be seen", "time will tell", or
+  "this is a space worth watching". Every sentence must earn its place.
+- The article must be complete — never trail off mid-sentence or leave sections empty.
 """
 
 _ARTICLE_STRUCTURE = """
@@ -110,9 +131,10 @@ def write_article(
     """
     focus_kw = story.get("focus_keyword", category["name"].lower())
 
+    _WRITER_MODELS = ["gemini-2.5-pro", "gemini-2.5-flash", "claude-haiku-4-5-20251001"]
+
     if editor_notes and previous_article:
-        log.info("  ✍️  Jordan Blake is revising based on editor feedback (Sonnet)…")
-        model  = "claude-sonnet-4-6"
+        log.info("  ✍️  Jordan Blake is revising based on editor feedback…")
         prompt = f"""{PERSONA}
 
 ⚠️ REVISION BRIEFING FROM PRIYA SHARMA (Managing Editor):
@@ -130,8 +152,7 @@ PREVIOUS DRAFT:
 {previous_article}"""
 
     else:
-        log.info("  ✍️  Jordan Blake is writing the initial draft (Haiku)…")
-        model  = "claude-haiku-4-5-20251001"
+        log.info("  ✍️  Jordan Blake is writing the initial draft…")
         prompt = f"""{PERSONA}
 
 Your task: Write a polished, publication-ready article for the {category['name']} section
@@ -157,12 +178,7 @@ Rules:
 - Do NOT fabricate statistics not in the source.
 Return ONLY the article HTML body."""
 
-    response = get_client().messages.create(
-        model=model,
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    content = response.content[0].text.strip()
+    content = call_llm_with_fallback(_WRITER_MODELS, 4096, [{"role": "user", "content": prompt}]).strip()
 
     # Strip markdown fences if the LLM wraps the HTML
     if content.startswith("```html"):

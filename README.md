@@ -1,6 +1,6 @@
 # News Bot — Multi-Site Multi-Agent Content Automation
 
-An autonomous AI publishing system that sources, researches, writes, edits, and publishes articles using a team of 5 specialized Claude agents. Designed to run for **multiple websites** with full segregation of site configs, social posting, and pipeline types.
+An autonomous AI publishing system that sources, researches, writes, edits, and publishes articles using a team of 5 specialized AI agents. Designed to run for **multiple websites** with full segregation of site configs, social posting, and pipeline types.
 
 ---
 
@@ -34,7 +34,7 @@ run.py                      ← Unified CLI entry point (--site, --pipeline)
 │   └── facebook.py         ← Facebook Page poster
 ├── pipelines/              ← Post type pipelines
 │   ├── base.py             ← Abstract Pipeline base class
-│   ├── daily_news.py       ← Main 5-category daily pipeline
+│   ├── daily_news.py       ← Main 5-category daily pipeline (parallel)
 │   ├── hot_takes.py        ← 80-100 word punchy opinion pieces
 │   ├── translated.py       ← Regulatory plain-English translations
 │   ├── follow_the_money.py ← Investment/funding analysis
@@ -42,13 +42,13 @@ run.py                      ← Unified CLI entry point (--site, --pipeline)
 │   ├── leaderboards.py     ← Monthly Top 10 rankings (1st of month)
 │   └── social.py           ← Social media queue processor
 ├── core/                   ← Shared infrastructure
-│   ├── llm.py              ← Anthropic client singleton + cost tracking
+│   ├── llm.py              ← Claude + Gemini client layer with cost tracking
 │   ├── db.py               ← SQLite database layer (per-site path)
 │   ├── retry.py            ← @with_retry decorator
 │   └── utils.py            ← Logging, safe_json_parse
 ├── auth/
 │   └── linkedin.py         ← LinkedIn OAuth 2.0 authorization flow
-├── preflight.py            ← Pre-flight health checks (takes SiteConfig)
+├── preflight.py            ← Pre-flight health checks (Anthropic, Gemini, Unsplash, WP)
 └── data/                   ← Per-site SQLite databases (gitignored)
     └── growstreammedia.db
 ```
@@ -62,7 +62,7 @@ run.py                      ← Unified CLI entry point (--site, --pipeline)
 ```bash
 python -m venv venv
 source venv/bin/activate
-pip install anthropic feedparser requests httpx python-dotenv json-repair
+pip install anthropic google-genai feedparser requests httpx python-dotenv json-repair
 ```
 
 ### 2. Configure credentials
@@ -70,18 +70,22 @@ pip install anthropic feedparser requests httpx python-dotenv json-repair
 Create `.env` in the project root:
 
 ```env
-# Required (global)
+# Required — Anthropic (fact-check, rank, social copy, SEO metadata)
 CLAUDE_API_KEY=sk-ant-...
+
+# Required — Google Gemini (article writing + editorial review)
+# Get your API key from https://aistudio.google.com/app/apikey
+GEMINI_API_KEY=AIza...
+
+# Required — Unsplash
 UNSPLASH_API_KEY=...
 
-# Required (GrowStream Media site)
-WP_URL=https://growstreammedia.com
+# Required — WordPress
+WP_URL=https://yoursite.com
 WP_USERNAME=newsbot
 WP_PASSWORD=your-app-password
 
 # Optional — LinkedIn social posting
-LINKEDIN_CLIENT_ID=...
-LINKEDIN_CLIENT_SECRET=...
 LINKEDIN_ACCESS_TOKEN=...
 LINKEDIN_ORG_URN=urn:li:organization:...
 LINKEDIN_PERSON_URN=urn:li:person:...
@@ -118,77 +122,6 @@ python run.py --site growstreammedia --pipeline daily_news --skip-preflight
 
 ---
 
-## Adding a New Website
-
-### Step 1 — Create the site package
-
-```bash
-mkdir -p sites/mynewsite
-touch sites/mynewsite/__init__.py
-```
-
-### Step 2 — `sites/mynewsite/feeds.py`
-
-```python
-CATEGORY_FEEDS = {
-    "my-category": ["https://rss.example.com/feed/"],
-}
-FALLBACK_FEEDS = ["https://rss.example.com/all/"]
-CATEGORIES = [
-    {
-        "slug":        "my-category",
-        "name":        "My Category",
-        "keywords":    ["keyword1", "keyword2"],
-        "image_style": "technology business",
-        "author_id":   1,
-    },
-]
-```
-
-### Step 3 — `sites/mynewsite/config.py`
-
-```python
-import os
-from sites.base import SiteConfig
-from sites.mynewsite.feeds import CATEGORIES, CATEGORY_FEEDS, FALLBACK_FEEDS
-
-SITE = SiteConfig(
-    name="mynewsite",
-    display_name="My New Site",
-    site_url="https://mynewsite.com",
-    wp_url=os.environ.get("MYNEWSITE_WP_URL", "https://mynewsite.com"),
-    wp_username=os.environ.get("MYNEWSITE_WP_USERNAME", ""),
-    wp_password=os.environ.get("MYNEWSITE_WP_PASSWORD", ""),
-    categories=CATEGORIES,
-    category_feeds=CATEGORY_FEEDS,
-    fallback_feeds=FALLBACK_FEEDS,
-    db_path="data/mynewsite.db",
-    linkedin_access_token=os.environ.get("MYNEWSITE_LINKEDIN_TOKEN", ""),
-)
-```
-
-### Step 4 — Register in `run.py`
-
-```python
-def _load_sites():
-    from sites.growstreammedia.config import SITE as growstreammedia
-    from sites.mynewsite.config import SITE as mynewsite
-    return {
-        "growstreammedia": growstreammedia,
-        "mynewsite": mynewsite,
-    }
-```
-
-### Step 5 — Run
-
-```bash
-python run.py --site mynewsite --pipeline daily_news
-```
-
-Each site gets its own isolated database at `data/<sitename>.db`. No credentials, feeds, or DB state are shared between sites.
-
----
-
 ## Agent Roles
 
 | Agent | Persona | Model | Role |
@@ -196,10 +129,10 @@ Each site gets its own isolated database at `data/<sitename>.db`. No credentials
 | 1 | Alex Rivera | — | RSS research & story fetching |
 | 2 | Dr. Sarah Chen | **Haiku** | Story ranking by market relevance + virality |
 | 3 | Marcus Webb | **Haiku** | Fact-check & credibility gate |
-| 4 | Priya Sharma | Sonnet | Editorial review (SEO + quality gate) |
-| 5 | Jordan Blake | Haiku / Sonnet | Article writing (Haiku draft → Sonnet revision only if scores < 8/8) |
+| 4 | Priya Sharma | **Gemini 3.0 Flash** | Editorial review (SEO + quality gate) |
+| 5 | Jordan Blake | **Gemini 2.5 Flash** | Article writing (initial draft + revisions) |
 
-> **Model selection rationale:** Agents 2 and 3 perform structured JSON classification tasks (scoring/approving headlines) that don't need Sonnet's reasoning depth. Agent 4 stays on Sonnet because it reviews full article quality. Agent 5 uses Haiku for the initial draft and only escalates to Sonnet when the editorial score falls below threshold — skipping the most expensive call in most runs.
+> **Model selection rationale:** Agents 2 and 3 perform structured JSON classification on short inputs — Haiku is sufficient and cheap. Agent 5 uses Gemini 2.5 Flash for full HTML article generation (high output volume, cost-sensitive). Agent 4 uses Gemini 3.0 Flash for editorial review (structured JSON scoring with detailed feedback).
 
 ---
 
@@ -207,13 +140,32 @@ Each site gets its own isolated database at `data/<sitename>.db`. No credentials
 
 | Pipeline | Recommended Schedule | Description |
 |----------|---------------------|-------------|
-| `daily_news` | Daily | 5 full-length articles across all categories |
+| `daily_news` | Daily | 5 full-length articles across all categories (runs in parallel) |
 | `hot_takes` | Daily | 80-100 word punchy opinion piece |
 | `translated` | Daily | Plain-English breakdown of regulatory documents |
 | `follow_the_money` | Daily | Investigative funding/investment analysis |
 | `dumbest_move` | Weekly (Sunday) | Humorous accountability piece |
 | `leaderboards` | Monthly (1st) | Top 10 ranked list on rotating monthly theme |
 | `social` | Post-publish | LinkedIn / X / Facebook queue processor |
+
+---
+
+## Daily News Pipeline — How It Works
+
+Each run processes all 5 categories **in parallel** (max 3 concurrent threads):
+
+```
+For each category (parallel):
+  1. Research    — fetch RSS stories matching category keywords
+  2. Rank        — score top 5 by market relevance + virality (Haiku)
+  3. Dedup       — skip if focus keyword published in last 30 days
+  4. Fact-check  — credibility gate (Haiku)
+  5. Write       — full HTML article, Gemini 2.5 Flash, up to 4096 tokens
+  6. Review loop — Gemini 3.0 Flash scores SEO + quality (max 3 revisions)
+     ↳ Truncation pre-check: if article is cut off mid-sentence,
+       send directly to rewrite without spending a review call
+  7. Publish     — upload image, post to WordPress, queue social
+```
 
 ---
 
@@ -314,16 +266,6 @@ python run.py --site growstreammedia --pipeline social
 python run.py --site growstreammedia --pipeline social --url https://growstreammedia.com/your-article/
 ```
 
-### What gets posted
-
-Each LinkedIn post is structured as:
-
-- **Hook** — 2 scroll-stopping opening lines, no emoji on the first line
-- **Body** — 3–4 short paragraphs with a contrarian angle, ends with a discussion question (max 1,200 chars)
-- **CTA** — one-line link to the article
-
-The article URL is attached as a LinkedIn article card showing the title and meta description.
-
 ### Troubleshooting
 
 | Error | Fix |
@@ -344,7 +286,7 @@ Each site gets its own SQLite database at `data/<sitename>.db`:
 | `raw_stories` | Fetched RSS stories (deduplication by URL) |
 | `published_articles` | Published post log + Unsplash image deduplication |
 | `social_queue` | Pending / published / failed social posts per platform |
-| `llm_metrics` | Token usage and estimated cost per agent call |
+| `llm_metrics` | Token usage and estimated cost per agent call (both Claude and Gemini) |
 
 ---
 
@@ -357,26 +299,97 @@ schedule:
   - cron: '0 2 * * *'
 ```
 
-Required GitHub Secrets: `CLAUDE_API_KEY`, `WP_USERNAME`, `WP_PASSWORD`, `UNSPLASH_API_KEY`
+Required GitHub Secrets: `CLAUDE_API_KEY`, `GEMINI_API_KEY`, `WP_USERNAME`, `WP_PASSWORD`, `UNSPLASH_API_KEY`
 
 ---
 
 ## Cost Estimate
 
-| Scope | Approx. Cost |
-|-------|-------------|
-| Per article | ~$0.016 |
-| Per day (5 articles) | ~$0.08 |
-| Per month | ~$2.40 |
+| Agent | Model | Daily tokens (approx.) | Daily cost |
+|-------|-------|----------------------|-----------|
+| Writer (Agent 5) | Gemini 2.5 Flash | 124K in / 114K out | ~$0.087 |
+| Editor (Agent 4) | Gemini 3.0 Flash | 83K in / 23K out | ~$0.026 |
+| Ranker + Fact-checker + SEO | Claude Haiku | ~60K in / 30K out | ~$0.055 |
+| **Total** | | | **~$0.17/day · ~$5/month** |
 
 **How costs are minimised:**
 
-- Story ranking and fact-checking run on Haiku (12× cheaper than Sonnet for classification tasks)
-- The Sonnet revision pass is skipped when the Haiku draft already scores ≥ 8/8 on SEO + quality
-- The editor receives plain text (HTML stripped) capped at 6,000 chars instead of 20,000 chars of raw HTML
-- Story picker calls in `hot_takes` and `dumbest_move` run on Haiku
-- Social copy generation (LinkedIn, X, Facebook) runs entirely on Haiku
-- All SEO metadata (keyword, title, meta description) runs on Haiku
+- Story ranking, fact-checking, and all SEO metadata run on Claude Haiku (cheapest classification model)
+- Article writing and editorial review use Gemini 2.5 / 3.0 Flash (93% cheaper than Sonnet for the same tasks)
+- Truncation pre-check skips the editorial review call entirely when an article is obviously cut off mid-sentence
+- Categories run in parallel — 3 concurrent threads cut wall-clock time from ~25 min to ~8 min without increasing token spend
+- Dedup check runs before fact-checking to avoid spending tokens on stories that will be skipped
+
+---
+
+## Adding a New Website
+
+### Step 1 — Create the site package
+
+```bash
+mkdir -p sites/mynewsite
+touch sites/mynewsite/__init__.py
+```
+
+### Step 2 — `sites/mynewsite/feeds.py`
+
+```python
+CATEGORY_FEEDS = {
+    "my-category": ["https://rss.example.com/feed/"],
+}
+FALLBACK_FEEDS = ["https://rss.example.com/all/"]
+CATEGORIES = [
+    {
+        "slug":        "my-category",
+        "name":        "My Category",
+        "keywords":    ["keyword1", "keyword2"],
+        "image_style": "technology business",
+        "author_id":   1,
+    },
+]
+```
+
+### Step 3 — `sites/mynewsite/config.py`
+
+```python
+import os
+from sites.base import SiteConfig
+from sites.mynewsite.feeds import CATEGORIES, CATEGORY_FEEDS, FALLBACK_FEEDS
+
+SITE = SiteConfig(
+    name="mynewsite",
+    display_name="My New Site",
+    site_url="https://mynewsite.com",
+    wp_url=os.environ.get("MYNEWSITE_WP_URL", "https://mynewsite.com"),
+    wp_username=os.environ.get("MYNEWSITE_WP_USERNAME", ""),
+    wp_password=os.environ.get("MYNEWSITE_WP_PASSWORD", ""),
+    categories=CATEGORIES,
+    category_feeds=CATEGORY_FEEDS,
+    fallback_feeds=FALLBACK_FEEDS,
+    db_path="data/mynewsite.db",
+    linkedin_access_token=os.environ.get("MYNEWSITE_LINKEDIN_TOKEN", ""),
+)
+```
+
+### Step 4 — Register in `run.py`
+
+```python
+def _load_sites():
+    from sites.growstreammedia.config import SITE as growstreammedia
+    from sites.mynewsite.config import SITE as mynewsite
+    return {
+        "growstreammedia": growstreammedia,
+        "mynewsite": mynewsite,
+    }
+```
+
+### Step 5 — Run
+
+```bash
+python run.py --site mynewsite --pipeline daily_news
+```
+
+Each site gets its own isolated database at `data/<sitename>.db`. No credentials, feeds, or DB state are shared between sites.
 
 ---
 
@@ -385,6 +398,7 @@ Required GitHub Secrets: `CLAUDE_API_KEY`, `WP_USERNAME`, `WP_PASSWORD`, `UNSPLA
 - **Site isolation** — Each `SiteConfig` carries its own WP credentials, feeds, categories, social tokens, and DB path. Two sites never share state.
 - **Generic agents** — Agent functions receive feeds/categories as parameters, never importing site-specific globals.
 - **Classed publishers & social posters** — `WordPressClient`, `LinkedInPoster`, etc. are instantiated per-site, making it safe to run multiple sites in the same process.
-- **Global infrastructure** — `CLAUDE_API_KEY` and `UNSPLASH_API_KEY` are the only truly global values (same API, same billing).
-- **Preflight first** — No LLM tokens are spent until all services are confirmed reachable.
-- **Right model for the job** — Classification and selection tasks use Haiku; long-form creative writing uses Sonnet. Never use Sonnet where Haiku is sufficient.
+- **Multi-provider LLM layer** — `core/llm.py` routes `gemini-*` calls to Google and `claude-*` calls to Anthropic via a unified `call_llm()` interface with cost tracking for both.
+- **Preflight first** — No LLM tokens are spent until all services (Anthropic, Gemini, Unsplash, WordPress) are confirmed reachable.
+- **Right model for the job** — Classification tasks use Haiku; long-form generation uses Gemini Flash. Sonnet is reserved for tasks where quality justifies the cost.
+- **Parallel categories** — The daily news pipeline runs all 5 categories concurrently (ThreadPoolExecutor, max 3 workers) to reduce wall-clock time by ~3×.

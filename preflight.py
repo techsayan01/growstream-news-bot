@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 import requests
 
-from core.llm import CLAUDE_API_KEY, get_client
+from core.llm import CLAUDE_API_KEY, GEMINI_API_KEY, get_client
 from core.retry import REQUEST_TIMEOUT
 from core.utils import log
 from sites.base import SiteConfig
@@ -64,12 +64,37 @@ class PreflightReport:
 def _check_config(site: SiteConfig) -> CheckResult:
     missing = []
     if not CLAUDE_API_KEY:         missing.append("CLAUDE_API_KEY")
+    if not GEMINI_API_KEY:         missing.append("GEMINI_API_KEY")
     if not UNSPLASH_API_KEY:       missing.append("UNSPLASH_API_KEY")
     if not site.wp_username:       missing.append("WP_USERNAME")
     if not site.wp_password:       missing.append("WP_PASSWORD")
     if missing:
         return CheckResult("Config vars", False, f"Missing: {', '.join(missing)}")
     return CheckResult("Config vars", True, "All present")
+
+
+def _check_gemini() -> CheckResult:
+    try:
+        from core.llm import get_gemini_client
+        client = get_gemini_client()
+        response = client.models.generate_content(
+            model="gemini-2.5-pro",
+            contents="ping",
+        )
+        response.text  # confirm response is readable
+        return CheckResult("Gemini API", True, "Reachable & authenticated")
+    except ImportError:
+        return CheckResult("Gemini API", False, "google-genai not installed — run: pip install google-genai")
+    except Exception as e:
+        err = str(e)
+        if "api_key" in err.lower() or "401" in err or "403" in err or "invalid" in err.lower():
+            return CheckResult("Gemini API", False, "Invalid API key")
+        elif "rate" in err.lower() or "quota" in err.lower() or "429" in err:
+            return CheckResult("Gemini API", False, "Rate limited / quota exceeded", fatal=False)
+        elif "timeout" in err.lower() or "connection" in err.lower():
+            return CheckResult("Gemini API", False, "Network timeout", fatal=False)
+        else:
+            return CheckResult("Gemini API", False, err[:80])
 
 
 def _check_anthropic() -> CheckResult:
@@ -203,6 +228,7 @@ def run_preflight(site: SiteConfig, abort_on_failure: bool = True) -> PreflightR
     report.add(_check_config(site))
     if report.passed:
         report.add(_check_anthropic())
+        report.add(_check_gemini())
         report.add(_check_unsplash())
         report.add(_check_wordpress(site))
 

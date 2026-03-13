@@ -8,7 +8,7 @@ Returns approval + actionable feedback for revision loops.
 import json
 import re
 
-from core.llm import get_client
+from core.llm import call_llm
 from core.retry import with_retry
 from core.utils import log, safe_json_parse
 
@@ -101,12 +101,7 @@ Rules:
 - Set rewrites_needed=true if approved=false
 - If rewrites_needed, editorial_notes MUST contain specific, actionable instructions"""
 
-    response = get_client().messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1200,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    result = safe_json_parse(response.content[0].text)
+    result = safe_json_parse(call_llm("gemini-3.1-pro-preview", 1200, [{"role": "user", "content": prompt}]))
     if not result:
         raise ValueError("Invalid editor response")
 
