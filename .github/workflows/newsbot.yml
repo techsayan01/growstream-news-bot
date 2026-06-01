@@ -1,0 +1,102 @@
+name: GrowStream News Bot
+
+on:
+  schedule:
+    # All times UTC. Adjust offsets to match your target timezone.
+    - cron: '0 3 * * *'      # 08:30 IST  — daily_news morning  (5 articles)
+    - cron: '30 8 * * *'     # 14:00 IST  — daily_news afternoon (5 articles)
+    - cron: '30 5 * * *'     # 11:00 IST  — hot_takes
+    - cron: '30 4 * * 1,3,5' # 10:00 IST Mon/Wed/Fri — follow_the_money
+    - cron: '30 4 * * 2,4'   # 10:00 IST Tue/Thu     — translated
+    - cron: '30 3 * * 0'     # 09:00 IST Sunday      — dumbest_move
+    - cron: '0 4 1 * *'      # 09:30 IST 1st of month — leaderboards
+
+  # Manual trigger — pick any pipeline from the dropdown
+  workflow_dispatch:
+    inputs:
+      pipeline:
+        description: 'Pipeline to run'
+        required: true
+        default: 'daily_news'
+        type: choice
+        options:
+          - daily_news
+          - hot_takes
+          - follow_the_money
+          - translated
+          - dumbest_move
+          - leaderboards
+          - social
+
+concurrency:
+  group: newsbot-${{ github.ref }}
+  cancel-in-progress: false   # never cancel a running publish job
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Determine pipeline
+        id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "pipeline=${{ inputs.pipeline }}" >> $GITHUB_OUTPUT
+          else
+            # Map UTC hour + day-of-week to pipeline name
+            HOUR=$(date -u +%H)
+            MIN=$(date -u +%M)
+            DOW=$(date -u +%u)    # 1=Mon ... 7=Sun
+            DAY=$(date -u +%d)
+
+            if   [ "$HOUR" = "03" ] && [ "$MIN" = "00" ]; then echo "pipeline=daily_news"        >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "08" ] && [ "$MIN" = "30" ]; then echo "pipeline=daily_news"        >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "05" ] && [ "$MIN" = "30" ]; then echo "pipeline=hot_takes"         >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "04" ] && [ "$MIN" = "30" ] && echo "135" | grep -q "$DOW"; then
+              echo "pipeline=follow_the_money" >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "04" ] && [ "$MIN" = "30" ] && echo "24"  | grep -q "$DOW"; then
+              echo "pipeline=translated"       >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "03" ] && [ "$MIN" = "30" ] && [ "$DOW" = "7" ]; then
+              echo "pipeline=dumbest_move"     >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "04" ] && [ "$MIN" = "00" ] && [ "$DAY" = "01" ]; then
+              echo "pipeline=leaderboards"     >> $GITHUB_OUTPUT
+            else
+              echo "pipeline=daily_news"       >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Run ${{ steps.pick.outputs.pipeline }}
+        run: python run.py --pipeline ${{ steps.pick.outputs.pipeline }}
+        env:
+          GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY }}
+          MONGODB_URI:      ${{ secrets.MONGODB_URI }}
+          WP_URL:           ${{ secrets.WP_URL }}
+          WP_USERNAME:      ${{ secrets.WP_USERNAME }}
+          WP_PASSWORD:      ${{ secrets.WP_PASSWORD }}
+          WP_API_KEY:       ${{ secrets.WP_API_KEY }}
+          UNSPLASH_API_KEY: ${{ secrets.UNSPLASH_API_KEY }}
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newsbot-logs-${{ github.run_id }}
+          path: '*.log'
+          retention-days: 7

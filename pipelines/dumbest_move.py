@@ -8,7 +8,7 @@ from datetime import datetime
 from agents.researcher import fetch_from_feeds
 from content.images import fetch_unsplash_images
 from content.seo import generate_meta_description
-from core.llm import get_client
+from core.llm import call_llm
 from core.retry import with_retry
 from core.utils import log, safe_json_parse
 from pipelines.base import Pipeline
@@ -52,12 +52,7 @@ Return ONLY JSON:
   "why_questionable": "One sentence on why it's a bad call"
 }}"""
 
-    r = get_client().messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=300,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    result = safe_json_parse(r.content[0].text)
+    result = safe_json_parse(call_llm("gemini-2.5-flash", 300, [{"role": "user", "content": prompt}]))
     if result and "index" in result:
         idx = int(result["index"])
         if 0 <= idx < len(stories):
@@ -111,12 +106,7 @@ Summary: {story['summary'][:600]}
 Decision maker: {decision_maker}
 What they did: {story.get('_dm_what', '')}"""
 
-    r = get_client().messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1500,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    content = r.content[0].text.strip()
+    content = call_llm("gemini-2.5-pro", 1500, [{"role": "user", "content": prompt}]).strip()
     if content.startswith("```"):
         content = content.split("```", 2)[1]
         if content.startswith("html"):

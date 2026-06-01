@@ -48,7 +48,7 @@ run.py                      ← Unified CLI entry point (--site, --pipeline)
 │   └── utils.py            ← Logging, safe_json_parse
 ├── auth/
 │   └── linkedin.py         ← LinkedIn OAuth 2.0 authorization flow
-├── preflight.py            ← Pre-flight health checks (Anthropic, Gemini, Unsplash, WP)
+├── preflight.py            ← Pre-flight health checks (Anthropic, per-model Gemini quota, Unsplash, WP)
 └── data/                   ← Per-site SQLite databases (gitignored)
     └── growstreammedia.db
 ```
@@ -116,9 +116,30 @@ python run.py --site growstreammedia --pipeline leaderboards
 python run.py --site growstreammedia --pipeline social                                    # process pending queue
 python run.py --site growstreammedia --pipeline social --url https://site.com/article/   # force-post a URL
 
+# Model overrides — use when Gemini quota is exhausted
+python run.py --site growstreammedia --pipeline daily_news --writer haiku
+python run.py --site growstreammedia --pipeline daily_news --reviewer haiku
+python run.py --site growstreammedia --pipeline daily_news --writer haiku --reviewer haiku
+
 # Developer flags
 python run.py --site growstreammedia --pipeline daily_news --skip-preflight
 ```
+
+#### `--writer` flag
+
+| Value | Behaviour |
+|-------|-----------|
+| `gemini` (default) | Tries **gemini-2.5-pro → gemini-2.5-flash → claude-haiku** in order, falling back on quota errors |
+| `haiku` | Skips Gemini entirely, writes with **claude-haiku-4-5-20251001** — use when Gemini writer quota is exhausted |
+
+#### `--reviewer` flag
+
+| Value | Behaviour |
+|-------|-----------|
+| `gemini` (default) | Uses **gemini-3.1-pro-preview** for editorial review |
+| `haiku` | Uses **claude-haiku-4-5-20251001** for editorial review — use when Gemini reviewer quota is exhausted |
+
+When a `haiku` override is passed, the pre-flight check skips the corresponding Gemini model quota test and the pipeline starts immediately.
 
 ---
 
@@ -127,12 +148,12 @@ python run.py --site growstreammedia --pipeline daily_news --skip-preflight
 | Agent | Persona | Model | Role |
 |-------|---------|-------|------|
 | 1 | Alex Rivera | — | RSS research & story fetching |
-| 2 | Dr. Sarah Chen | **Haiku** | Story ranking by market relevance + virality |
-| 3 | Marcus Webb | **Haiku** | Fact-check & credibility gate |
-| 4 | Priya Sharma | **Gemini 3.0 Flash** | Editorial review (SEO + quality gate) |
-| 5 | Jordan Blake | **Gemini 2.5 Flash** | Article writing (initial draft + revisions) |
+| 2 | Dr. Sarah Chen | **claude-haiku-4-5** | Story ranking by market relevance + virality |
+| 3 | Marcus Webb | **claude-haiku-4-5** | Fact-check & credibility gate |
+| 4 | Priya Sharma | **gemini-3.1-pro-preview** | Editorial review (SEO + quality gate) |
+| 5 | Jordan Blake | **gemini-2.5-pro → gemini-2.5-flash → haiku** | Article writing with automatic quota fallback |
 
-> **Model selection rationale:** Agents 2 and 3 perform structured JSON classification on short inputs — Haiku is sufficient and cheap. Agent 5 uses Gemini 2.5 Flash for full HTML article generation (high output volume, cost-sensitive). Agent 4 uses Gemini 3.0 Flash for editorial review (structured JSON scoring with detailed feedback).
+> **Model selection rationale:** Agents 2 and 3 perform structured JSON classification on short inputs — Haiku is sufficient and cheap. Agent 4 uses `gemini-3.1-pro-preview` for deep editorial review. Agent 5 uses a fallback chain: starts with Gemini 2.5 Pro for best quality, falls back to Gemini 2.5 Flash, then Claude Haiku if Gemini quotas are exhausted. Use `--writer haiku` to force Haiku directly when Gemini daily quota is used up.
 
 ---
 
@@ -160,8 +181,8 @@ For each category (parallel):
   2. Rank        — score top 5 by market relevance + virality (Haiku)
   3. Dedup       — skip if focus keyword published in last 30 days
   4. Fact-check  — credibility gate (Haiku)
-  5. Write       — full HTML article, Gemini 2.5 Flash, up to 4096 tokens
-  6. Review loop — Gemini 3.0 Flash scores SEO + quality (max 3 revisions)
+  5. Write       — full HTML article, gemini-2.5-pro → gemini-2.5-flash → haiku fallback
+  6. Review loop — gemini-3.1-pro-preview scores SEO + quality (max 3 revisions)
      ↳ Truncation pre-check: if article is cut off mid-sentence,
        send directly to rewrite without spending a review call
   7. Publish     — upload image, post to WordPress, queue social

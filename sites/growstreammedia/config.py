@@ -41,8 +41,8 @@ SITE = SiteConfig(
     category_feeds=CATEGORY_FEEDS,
     fallback_feeds=FALLBACK_FEEDS,
 
-    # Database (per-site SQLite file)
-    db_path="data/growstreammedia.db",
+    # Database (MongoDB Atlas — db name per site)
+    db_name="growstreammedia",
 
     # LinkedIn
     linkedin_access_token=os.environ.get("LINKEDIN_ACCESS_TOKEN", ""),

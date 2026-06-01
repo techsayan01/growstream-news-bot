@@ -5,7 +5,8 @@ Writes initial drafts (Haiku) and revision passes (Sonnet).
 """
 
 import json
-
+import os
+from content.templates import get_template
 from core.llm import call_llm_with_fallback
 from core.retry import with_retry
 from core.utils import log
@@ -122,60 +123,85 @@ def write_article(
     angle: str,
     editor_notes: str = "",
     previous_article: str = "",
+    article_type: str = "breaking_news",
 ) -> str | None:
-    """Write or revise an 800–1000 word SEO-optimised article.
+    """Write or revise an SEO-optimised article using the template for *article_type*.
 
     When *editor_notes* and *previous_article* are provided, Jordan revises the
-    existing draft based on editor feedback (uses Sonnet for better reasoning).
-    Otherwise an initial draft is written from scratch (uses Haiku).
+    existing draft based on editor feedback.
+    Otherwise an initial draft is written from scratch.
     """
     focus_kw = story.get("focus_keyword", category["name"].lower())
+    template  = get_template(article_type)
+    structure = template["structure"]
+    extra_rules = template["writer_rules"]
 
-    _WRITER_MODELS = ["gemini-2.5-pro", "gemini-2.5-flash", "claude-haiku-4-5-20251001"]
+    _WRITER_MODELS = (
+        ["gemini-2.5-pro", "gemini-2.5-flash"]
+        if os.environ.get("NEWSBOT_WRITER") == "pro"
+        else ["gemini-2.5-flash"]
+    )
 
     if editor_notes and previous_article:
         log.info("  ✍️  Jordan Blake is revising based on editor feedback…")
         prompt = f"""{PERSONA}
 
-⚠️ REVISION BRIEFING FROM PRIYA SHARMA (Managing Editor):
+ARTICLE TYPE: {article_type}
+
+REVISION BRIEFING FROM PRIYA SHARMA (Managing Editor):
 {editor_notes}
 
 Your task: Revise the following draft to address EVERY point in Priya's feedback.
 - Do NOT start from scratch. Keep what's working; fix what isn't.
-- Ensure the "15 Sec Read" summary section at the top remains intact.
+- Preserve all styled boxes, tables, and callout divs from the template.
 - Ensure the focus keyword "{focus_kw}" appears naturally 4–6 times.
-- Format as scannable HTML. Allowed tags: h2, h3, h4, p, ul, li, strong, em, blockquote, div.
-- Keep any styled blockquotes or "Bottom Line" boxes intact.
+- Format as scannable HTML. Allowed tags: h2, h3, h4, p, ul, li, ol, strong, em, blockquote, div, table, thead, tbody, tr, th, td.
 - Return ONLY the final revised HTML body.
 
 PREVIOUS DRAFT:
 {previous_article}"""
 
     else:
-        log.info("  ✍️  Jordan Blake is writing the initial draft…")
+        log.info(f"  ✍️  Jordan Blake is writing [{article_type}] draft…")
+
+        # Build rich source block from all extracted fields
+        source_lines = [
+            f"- Headline      : {story.get('headline', '')}",
+            f"- Market Trend  : {story.get('market_trend', '')}",
+            f"- Editorial angle: {angle}",
+            f"- Full text     :\n{story.get('summary', '')}",
+        ]
+        if story.get("key_figures"):
+            source_lines.append(f"- Key figures (USE THESE VERBATIM): {json.dumps(story['key_figures'])}")
+        if story.get("named_entities"):
+            source_lines.append(f"- Named entities (USE THESE VERBATIM): {json.dumps(story['named_entities'])}")
+        if story.get("direct_quotes"):
+            source_lines.append(f"- Direct quotes (USE VERBATIM in blockquotes): {json.dumps(story['direct_quotes'])}")
+        source_block = "\n".join(source_lines)
+
         prompt = f"""{PERSONA}
+
+ARTICLE TYPE: {article_type}
 
 Your task: Write a polished, publication-ready article for the {category['name']} section
 of GrowStream Media. Target audience: CFOs, investors, heads of strategy.
 
 Focus keyword (use naturally 4–6 times): "{focus_kw}"
 
-Source material:
-- Headline    : {story.get('headline','')}
-- Market Trend: {story.get('market_trend','')}
-- Summary     : {story.get('summary','')}
-- Key Facts   : {json.dumps(story.get('key_facts',[]))}
-- Editorial angle: {angle}
+SOURCE MATERIAL — use ONLY the facts, figures, and entities below. Do not invent anything:
+{source_block}
 
-Write an 800–1000 word SEO-optimised article using this EXACT structure:
-{_ARTICLE_STRUCTURE}
+Write an 800–1200 word SEO-optimised article using this EXACT structure:
+{structure}
 
 Rules:
-- Use the focus keyword in the first 100 words, at least one H2, and the conclusion
-- Write in HTML only. Allowed tags: h2, h3, h4, p, ul, li, strong, em, blockquote, div.
-- Use <strong> for key metrics and company names; <blockquote style="border-left: 4px solid #adb5bd; padding-left: 15px; font-style: italic; color: #495057; margin: 20px 0;"> for quotes.
-- No <title> tag. Start directly with the hook paragraph.
-- Do NOT fabricate statistics not in the source.
+- Use the focus keyword in the first 100 words, at least one H2, and the conclusion.
+- Write in HTML only. Allowed tags: h2, h3, h4, p, ul, li, ol, strong, em, blockquote, div, table, thead, tbody, tr, th, td.
+- Use <strong> on every key metric, percentage, dollar figure, and company name.
+- Preserve all styled div boxes and tables exactly as shown in the template — fill them with real content.
+- No <title> tag. No emojis. Start directly with the hook paragraph.
+- Do NOT fabricate statistics, names, or figures not in the source material.
+{extra_rules}
 Return ONLY the article HTML body."""
 
     content = call_llm_with_fallback(_WRITER_MODELS, 4096, [{"role": "user", "content": prompt}]).strip()

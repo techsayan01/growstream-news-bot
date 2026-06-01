@@ -3,8 +3,10 @@ Shared logging and JSON utilities.
 No env-var reading here — that lives in sites/ or core/llm.py.
 """
 
+import hashlib
 import json
 import logging
+import re
 from datetime import datetime
 
 
@@ -21,6 +23,45 @@ def setup_logging(log_name: str = "newsbot") -> logging.Logger:
 
 
 log = setup_logging()
+
+# ── Headline normalisation & fingerprinting ───────────────────────────────────
+
+_STOP_WORDS = frozenset({
+    "the", "a", "an", "of", "to", "in", "for", "and", "or", "is", "are",
+    "its", "by", "on", "at", "with", "as", "be", "has", "have", "says",
+    "said", "from", "that", "this", "it", "will", "new", "how", "what",
+    "why", "when", "who", "over", "into", "about", "after", "up", "their",
+    "than", "but", "not", "was", "were", "been", "would", "could", "should",
+})
+
+
+def normalise_headline(text: str) -> str:
+    """Lowercase, strip punctuation/numbers/stopwords — for similarity comparison."""
+    text = text.lower()
+    text = re.sub(r"[^a-z\s]", " ", text)
+    tokens = [t for t in text.split() if t not in _STOP_WORDS and len(t) > 2]
+    return " ".join(tokens)
+
+
+def headline_fingerprint(text: str) -> str:
+    """Order-independent SHA-256 fingerprint of a normalised headline.
+
+    Sorting tokens makes "Stripe raises funding" == "funding raises Stripe",
+    catching rearranged headlines from different sources.
+    Returns first 16 hex chars (64-bit collision space — sufficient for a news bot).
+    """
+    tokens = sorted(normalise_headline(text).split())
+    return hashlib.sha256(" ".join(tokens).encode()).hexdigest()[:16]
+
+
+def headline_jaccard(a: str, b: str) -> float:
+    """Jaccard similarity on normalised token sets (ignores numbers)."""
+    na = re.sub(r"\d+", "", normalise_headline(a))
+    nb = re.sub(r"\d+", "", normalise_headline(b))
+    sa, sb = set(na.split()), set(nb.split())
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
 
 
 def safe_json_parse(raw_text: str):

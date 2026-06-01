@@ -1,6 +1,11 @@
-# Core AI providers
-anthropic>=0.84.0
+# Core AI provider
 google-genai>=1.66.0
+
+# Database
+pymongo>=4.7.0
+
+# Scheduler
+schedule>=1.2.2
 
 # RSS & HTTP
 feedparser>=6.0.12

@@ -8,7 +8,7 @@ from datetime import datetime
 from agents.researcher import fetch_from_feeds
 from content.images import fetch_unsplash_images
 from content.seo import generate_meta_description
-from core.llm import get_client
+from core.llm import call_llm
 from core.retry import with_retry
 from core.utils import log
 from pipelines.base import Pipeline
@@ -70,12 +70,7 @@ Headline: {story['headline']}
 Source: {story['source']}
 Summary: {story['summary'][:800]}"""
 
-    r = get_client().messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    content = r.content[0].text.strip()
+    content = call_llm("gemini-2.5-pro", 2000, [{"role": "user", "content": prompt}]).strip()
     if content.startswith("```"):
         content = content.split("```", 2)[1]
         if content.startswith("html"):

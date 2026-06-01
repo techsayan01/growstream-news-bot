@@ -67,28 +67,50 @@ class WordPressClient(Publisher):
 
     # ── Deduplication ─────────────────────────────────────────────────────────
 
-    def article_exists(self, query: str, days: int = 30) -> bool:
-        """Return True if a post matching *query* was published within *days* days."""
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
+    def article_exists(self, title: str, days: int = 30) -> bool:
+        """Layer 4 — final safeguard: search WordPress by title words.
+
+        Searches by the first 5 significant words of the SEO title (not the
+        generic focus keyword) so the match is specific enough to avoid false
+        positives while still catching exact rewrites.
+
+        Layers 1-3 (URL, fingerprint, semantic) run locally before this is
+        called, so this is only reached when those checks pass.
+        """
+        from core.utils import normalise_headline
+        # Use the 5 most distinctive words from the title
+        words = normalise_headline(title).split()[:5]
+        if not words:
+            return False
+        query  = " ".join(words)
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=days)
+        ).strftime("%Y-%m-%dT%H:%M:%S")
+
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 r = requests.get(
                     f"{self.wp_url}/wp-json/wp/v2/posts",
-                    params={"search": query, "per_page": 1, "after": cutoff},
+                    params={"search": query, "per_page": 3, "after": cutoff,
+                            "_fields": "id,title,link"},
                     headers=self._auth_header(),
                     timeout=REQUEST_TIMEOUT,
                 )
                 r.raise_for_status()
                 posts = r.json()
                 if posts:
-                    log.warning(f"  ⚠ Article matching '{query}' already published in last {days}d (ID: {posts[0]['id']})")
+                    matched = posts[0]
+                    log.warning(
+                        f"  ⚠ [Layer 4] WordPress title match for '{query}' → "
+                        f"ID {matched['id']} | {matched.get('link','')}"
+                    )
                     return True
                 return False
             except Exception as e:
                 if attempt < MAX_RETRIES:
                     time.sleep(RETRY_DELAY)
                 else:
-                    log.error(f"  ✗ Could not check for existing article '{query}': {e}")
+                    log.error(f"  ✗ Layer 4 dedup check failed: {e}")
         return False
 
     def get_recent_featured_image_slugs(self, days: int = 7) -> set[str]:
@@ -259,6 +281,11 @@ class WordPressClient(Publisher):
         author_id: int | None = None,
         unsplash_id: str | None = None,
         slug: str | None = None,
+        source_url: str | None = None,
+        category: str | None = None,
+        article_type: str | None = None,
+        seo_score: int | None = None,
+        quality_score: int | None = None,
     ) -> str | None:
         """Publish a post via WordPress REST API. Returns the live URL or None."""
         for attempt in range(1, MAX_RETRIES + 1):
@@ -294,7 +321,12 @@ class WordPressClient(Publisher):
                     post_data = r.json()
                     post_id   = post_data.get("id")
                     post_url  = post_data.get("link", "")
-                    log_published_article(post_id, title, focus_keyword, unsplash_id)
+                    log_published_article(
+                        post_id, title, focus_keyword, unsplash_id,
+                        source_url=source_url, category=category,
+                        article_type=article_type,
+                        seo_score=seo_score, quality_score=quality_score,
+                    )
                     return post_url
                 elif r.status_code in (401, 403):
                     log.error(f"  ✗ WordPress auth/permissions error {r.status_code}")

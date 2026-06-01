@@ -11,6 +11,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
+from agents.classifier import classify_story
 from agents.editor import review_article
 from agents.factchecker import factcheck_story
 from agents.ranker import rank_stories
@@ -68,13 +69,18 @@ class DailyNewsPipeline(Pipeline):
             return None
 
         for rank, best_story in enumerate(top_stories, start=1):
+            if not isinstance(best_story, dict):
+                log.warning(f"  ⚠ Story #{rank} is not a dict ({type(best_story).__name__}) — skipping")
+                continue
+
             log.info(f"\n  ═══ Attempting Top Story #{rank} for {cat_name} ═══")
 
-            # Step 3: Dedup check (before spending tokens on fact-check)
+            # Step 3: Dedup check (Layers 3 already ran in researcher;
+            # Layer 4 WordPress title search runs here as final safeguard)
             focus_keyword = generate_focus_keyword(best_story.get("headline", ""), cat_name)
             log.info(f"  🔑 Focus keyword: {focus_keyword}")
-            if self.wp.article_exists(focus_keyword):
-                log.warning(f"  ⚠ Skipping #{rank} — already published recently")
+            if self.wp.article_exists(best_story.get("headline", "")):
+                log.warning(f"  ⚠ Skipping #{rank} — Layer 4 WP title match")
                 continue
 
             # Step 4: Fact-check
@@ -88,11 +94,14 @@ class DailyNewsPipeline(Pipeline):
             img_keywords = factcheck.get("image_keywords", category["image_style"].split())
             story["focus_keyword"] = focus_keyword
 
+            # Step 4b: Classify article type
+            article_type = classify_story(story)
+
             # Images
             images = fetch_unsplash_images(img_keywords, category["image_style"], used_slugs=used_image_slugs)
 
             # Step 5: Write
-            content = write_article(story, category, angle)
+            content = write_article(story, category, angle, article_type=article_type)
             if not content:
                 log.warning(f"  ⚠ Story #{rank} writing failed — skipping")
                 continue
@@ -122,6 +131,7 @@ class DailyNewsPipeline(Pipeline):
                             story, category, angle,
                             editor_notes="The article was cut off mid-sentence. Rewrite it in full, ensuring every section is complete and the article ends with a proper conclusion and FAQ.",
                             previous_article=content,
+                            article_type=article_type,
                         )
                         if revised:
                             content = revised
@@ -130,7 +140,8 @@ class DailyNewsPipeline(Pipeline):
                     break
 
                 editorial = review_article(
-                    content, story, seo_title, focus_keyword, meta_description, category
+                    content, story, seo_title, focus_keyword, meta_description, category,
+                    article_type=article_type,
                 )
                 if not editorial:
                     log.error("  ✗ Editor failed — aborting publication")
@@ -158,7 +169,7 @@ class DailyNewsPipeline(Pipeline):
                     issues = editorial.get("issues", [])
                     if issues:
                         notes += "\n\nSpecific Issues:\n- " + "\n- ".join(issues)
-                    revised = write_article(story, category, angle, editor_notes=notes, previous_article=content)
+                    revised = write_article(story, category, angle, editor_notes=notes, previous_article=content, article_type=article_type)
                     if revised:
                         content = revised
                         meta_description = generate_meta_description(seo_title, content, focus_keyword)
@@ -200,6 +211,11 @@ class DailyNewsPipeline(Pipeline):
                 focus_keyword=focus_keyword,
                 author_id=category.get("author_id"),
                 unsplash_id=unsplash_id,
+                source_url=story.get("url"),
+                category=cat_name,
+                article_type=article_type,
+                seo_score=editorial.get("seo_score") if editorial else None,
+                quality_score=editorial.get("quality_score") if editorial else None,
             )
 
             if post_url:
@@ -214,7 +230,6 @@ class DailyNewsPipeline(Pipeline):
                     "url":           post_url,
                     "trend":         story.get("market_trend", ""),
                     "score":         story.get("market_relevance_score", "?"),
-                    "virality":      story.get("virality_score", "?"),
                     "seo_score":     seo_score,
                     "quality_score": quality_score,
                     "images":        len(images),

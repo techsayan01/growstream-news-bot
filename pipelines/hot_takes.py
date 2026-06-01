@@ -9,7 +9,7 @@ from datetime import datetime
 
 from agents.researcher import fetch_from_feeds
 from content.images import fetch_unsplash_images
-from core.llm import get_client
+from core.llm import call_llm
 from core.retry import with_retry
 from core.utils import log, safe_json_parse
 from pipelines.base import Pipeline
@@ -43,12 +43,7 @@ Return ONLY JSON:
   "index": 0,
   "reason": "One sentence on why this is the most provocative story."
 }}"""
-    r = get_client().messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=200,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    result = safe_json_parse(r.content[0].text)
+    result = safe_json_parse(call_llm("gemini-2.5-flash", 200, [{"role": "user", "content": prompt}]))
     if result and "index" in result:
         idx = int(result["index"])
         if 0 <= idx < len(stories):
@@ -67,6 +62,7 @@ Write an 80-100 word hot take on this story. Rules:
 - End with one quotable one-liner.
 - Write in first-person editorial voice.
 - No intro, no fluff. Tweet energy but with a brain.
+- No emojis anywhere.
 - Format as a single <p> paragraph — no headings, no lists.
 - Return ONLY the HTML <p> tag.
 
@@ -74,12 +70,7 @@ Story:
 Headline: {story['headline']}
 Summary: {story['summary'][:500]}"""
 
-    r = get_client().messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=300,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    content = r.content[0].text.strip()
+    content = call_llm("gemini-2.5-flash", 300, [{"role": "user", "content": prompt}]).strip()
     if not content.startswith("<p"):
         content = f"<p>{content}</p>"
     return content
@@ -129,26 +120,19 @@ class HotTakesPipeline(Pipeline):
             return
 
         today = datetime.now().strftime("%B %d, %Y")
-        title = f"Hot Take: {story['headline'][:55]}"
-        # Slug must be clean ASCII so WordPress doesn't encode emojis in the URL
+        title = f"Hot Take: {story['headline']}"
         import re as _re
-        slug = _re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
-
-        # Inject white colour explicitly on the LLM-generated <p> so the theme
-        # cannot override it (parent color: #fff is not specific enough in WP).
-        styled_content = _re.sub(
-            r"<p(\s[^>]*)?>",
-            lambda m: m.group(0).replace("<p", '<p style="color:#ffffff;margin:0 0 16px;"', 1)
-            if 'style=' not in (m.group(1) or '')
-            else m.group(0),
-            content,
-        )
+        # Strip emojis from LLM-generated content
+        content = _re.sub(r'[\U00010000-\U0010ffff]', '', content, flags=_re.UNICODE)
+        content = _re.sub(r'[\U00002600-\U000027BF]', '', content, flags=_re.UNICODE)
+        # Slug must be clean ASCII so WordPress doesn't encode emojis in the URL
+        slug = _re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:80]
 
         html = f"""
-<div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#ffffff;padding:30px;border-radius:12px;margin-bottom:24px;">
-  <p style="font-size:0.85em;text-transform:uppercase;letter-spacing:2px;color:#a0aec0;margin-top:0;">&#x1F525; {self.site.display_name} Hot Take &middot; {today}</p>
-  {styled_content}
-  <p style="margin-bottom:0;font-size:0.8em;color:#a0aec0;">Source: <a href="{story.get('url','#')}" style="color:#90cdf4;" target="_blank" rel="noopener">{story.get('source','Unknown')}</a></p>
+<div style="background:#f8f9fa;border-left:4px solid #007bff;padding:24px 28px;border-radius:8px;margin-bottom:24px;">
+  <p style="font-size:0.8em;text-transform:uppercase;letter-spacing:2px;color:#6c757d;margin-top:0;">{self.site.display_name} Hot Take &middot; {today}</p>
+  {content}
+  <p style="margin-bottom:0;font-size:0.8em;color:#6c757d;">Source: <a href="{story.get('url','#')}" style="color:#0056b3;" target="_blank" rel="noopener">{story.get('source','Unknown')}</a></p>
 </div>
 """
 

@@ -25,6 +25,9 @@ growstream/growstream.db
 # Legacy social dedup state
 growstream/social_posted.json
 
+# Google Cloud service account key files
+*-[0-9a-f]*.json
+
 # IDE
 .vscode/
 .idea/

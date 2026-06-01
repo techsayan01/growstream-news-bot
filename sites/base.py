@@ -28,7 +28,7 @@ class SiteConfig:
     fallback_feeds: list[str]         = field(default_factory=list)
 
     # ── Database ─────────────────────────────────────────────────────────────
-    db_path: str = "data/newsbot.db"
+    db_name: str = "newsbot"
 
     # ── Social: LinkedIn ─────────────────────────────────────────────────────
     linkedin_access_token: str = ""

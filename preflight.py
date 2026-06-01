@@ -6,7 +6,7 @@ and credentials are valid. Aborts early to avoid wasting API tokens.
 
 Checks (in order):
   1. Site config fields present (no network)
-  2. Anthropic API  — cheapest possible ping (1-token request)
+  2. Gemini API     — model metadata lookup (no quota consumed)
   3. Unsplash API   — credential validation
   4. WordPress API  — Application Password auth + publish rights
 """
@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 import requests
 
-from core.llm import CLAUDE_API_KEY, GEMINI_API_KEY, get_client
+from core.llm import GEMINI_API_KEY
 from core.retry import REQUEST_TIMEOUT
 from core.utils import log
 from sites.base import SiteConfig
@@ -63,7 +63,6 @@ class PreflightReport:
 
 def _check_config(site: SiteConfig) -> CheckResult:
     missing = []
-    if not CLAUDE_API_KEY:         missing.append("CLAUDE_API_KEY")
     if not GEMINI_API_KEY:         missing.append("GEMINI_API_KEY")
     if not UNSPLASH_API_KEY:       missing.append("UNSPLASH_API_KEY")
     if not site.wp_username:       missing.append("WP_USERNAME")
@@ -73,49 +72,52 @@ def _check_config(site: SiteConfig) -> CheckResult:
     return CheckResult("Config vars", True, "All present")
 
 
-def _check_gemini() -> CheckResult:
+def _check_gemini_model(model: str, label: str, fatal: bool) -> CheckResult:
+    """Check Gemini model availability using a metadata lookup (no quota consumed)."""
     try:
         from core.llm import get_gemini_client
         client = get_gemini_client()
-        response = client.models.generate_content(
-            model="gemini-2.5-pro",
-            contents="ping",
-        )
-        response.text  # confirm response is readable
-        return CheckResult("Gemini API", True, "Reachable & authenticated")
+        # Use models.get() — a metadata call that validates the API key and confirms
+        # the model exists without burning any generation quota.
+        client.models.get(model=model)
+        return CheckResult(label, True, "Reachable (quota not pre-checked — errors surface at runtime)")
     except ImportError:
-        return CheckResult("Gemini API", False, "google-genai not installed — run: pip install google-genai")
+        return CheckResult(label, False, "google-genai not installed")
     except Exception as e:
         err = str(e)
         if "api_key" in err.lower() or "401" in err or "403" in err or "invalid" in err.lower():
-            return CheckResult("Gemini API", False, "Invalid API key")
-        elif "rate" in err.lower() or "quota" in err.lower() or "429" in err:
-            return CheckResult("Gemini API", False, "Rate limited / quota exceeded", fatal=False)
+            return CheckResult(label, False, "Invalid API key", fatal=fatal)
+        elif "404" in err or "not found" in err.lower():
+            return CheckResult(label, False, "Model not found / unavailable", fatal=fatal)
         elif "timeout" in err.lower() or "connection" in err.lower():
-            return CheckResult("Gemini API", False, "Network timeout", fatal=False)
+            return CheckResult(label, False, "Network timeout", fatal=False)
         else:
-            return CheckResult("Gemini API", False, err[:80])
+            return CheckResult(label, False, err[:80], fatal=fatal)
 
 
-def _check_anthropic() -> CheckResult:
-    try:
-        get_client().messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1,
-            messages=[{"role": "user", "content": "ping"}],
-        )
-        return CheckResult("Anthropic API", True, "Reachable & authenticated")
-    except Exception as e:
-        err = str(e)
-        if "authentication" in err.lower() or "api_key" in err.lower() or "401" in err:
-            msg = "Invalid API key"
-        elif "rate" in err.lower():
-            msg = "Rate limited — try again shortly"
-        elif "timeout" in err.lower() or "connection" in err.lower():
-            msg = "Network timeout"
-        else:
-            msg = err
-        return CheckResult("Anthropic API", False, msg)
+def _check_gemini_quota() -> list[CheckResult]:
+    """Check quota for every Gemini model used in the pipeline.
+
+    When NEWSBOT_WRITER=haiku the Gemini writer models are skipped since
+    the pipeline won't call them.
+    """
+    results = []
+
+    if os.environ.get("NEWSBOT_REVIEWER") == "pro":
+        results.append(_check_gemini_model("gemini-2.5-pro",   "Gemini reviewer (2.5-pro)  ", fatal=True))
+    else:
+        results.append(_check_gemini_model("gemini-2.5-flash", "Gemini reviewer (2.5-flash)", fatal=True))
+
+    if os.environ.get("NEWSBOT_WRITER") == "pro":
+        results += [
+            _check_gemini_model("gemini-2.5-pro",   "Gemini writer   (2.5-pro)  ", fatal=False),
+            _check_gemini_model("gemini-2.5-flash",  "Gemini writer fb (2.5-flash)", fatal=False),
+        ]
+    else:
+        results.append(_check_gemini_model("gemini-2.5-flash", "Gemini writer   (2.5-flash)", fatal=True))
+
+    return results
+
 
 
 def _check_unsplash() -> CheckResult:
@@ -227,8 +229,8 @@ def run_preflight(site: SiteConfig, abort_on_failure: bool = True) -> PreflightR
     report = PreflightReport()
     report.add(_check_config(site))
     if report.passed:
-        report.add(_check_anthropic())
-        report.add(_check_gemini())
+        for result in _check_gemini_quota():
+            report.add(result)
         report.add(_check_unsplash())
         report.add(_check_wordpress(site))
 

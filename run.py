@@ -98,11 +98,33 @@ def main():
         help="For the social pipeline: force-post a specific article URL",
     )
     parser.add_argument(
+        "--writer",
+        default="flash",
+        choices=["flash", "pro"],
+        help=(
+            "Writer model. 'flash' (default): gemini-2.5-flash — fast and cheap. "
+            "'pro': gemini-2.5-pro → gemini-2.5-flash fallback — higher quality."
+        ),
+    )
+    parser.add_argument(
+        "--reviewer",
+        default="flash",
+        choices=["flash", "pro"],
+        help=(
+            "Reviewer model. 'flash' (default): gemini-2.5-flash — fast and cheap. "
+            "'pro': gemini-2.5-pro — stricter editorial bar."
+        ),
+    )
+    parser.add_argument(
         "--skip-preflight",
         action="store_true",
         help="Skip pre-flight checks (useful for debugging)",
     )
     args = parser.parse_args()
+
+    import os
+    os.environ["NEWSBOT_WRITER"]   = args.writer
+    os.environ["NEWSBOT_REVIEWER"] = args.reviewer
 
     # Load site config
     sites = _load_sites()
@@ -113,7 +135,7 @@ def main():
     site = sites[args.site]
 
     # Bootstrap infrastructure
-    configure_db(site.db_path)
+    configure_db(site.db_name)
     from core.db import log_llm_usage
     init_client(db_log_fn=log_llm_usage)
 
