@@ -7,7 +7,7 @@ from datetime import datetime
 
 from agents.researcher import fetch_from_feeds
 from content.images import fetch_unsplash_images
-from content.seo import generate_meta_description
+from content.seo import generate_meta_description, generate_tags
 from core.llm import call_llm
 from core.retry import with_retry
 from core.utils import log
@@ -132,6 +132,8 @@ class TranslatedPipeline(Pipeline):
 
         focus_keyword = "regulatory translation finance"
         meta          = generate_meta_description(title, content, focus_keyword)
+        tag_names     = generate_tags(story["headline"], focus_keyword, "regulatory")
+        tag_ids       = self.wp.get_or_create_tags(tag_names)
 
         post_url = self.wp.publish(
             title=title,
@@ -140,6 +142,8 @@ class TranslatedPipeline(Pipeline):
             featured_image_id=featured_id,
             meta_description=meta,
             focus_keyword=focus_keyword,
+            tags=tag_ids,
+            author_id=4,   # Priya Mehta — regulatory/explainer content
             unsplash_id=unsplash_id,
         )
         if post_url:

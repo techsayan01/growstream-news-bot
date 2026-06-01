@@ -18,7 +18,7 @@ from agents.ranker import rank_stories
 from agents.researcher import research_agent
 from agents.writer import write_article
 from content.images import fetch_unsplash_images
-from content.seo import generate_focus_keyword, generate_meta_description, generate_seo_title
+from content.seo import generate_focus_keyword, generate_meta_description, generate_seo_title, generate_tags
 from core.db import mark_raw_story_processed
 from core.utils import log
 from pipelines.base import Pipeline
@@ -186,6 +186,16 @@ class DailyNewsPipeline(Pipeline):
                 )
                 continue
 
+            # Generate tags
+            tag_names = generate_tags(
+                story.get("headline", ""),
+                focus_keyword,
+                story.get("market_trend", cat_name),
+                named_entities=story.get("named_entities"),
+            )
+            tag_ids = self.wp.get_or_create_tags(tag_names)
+            log.info(f"  🏷  Tags: {', '.join(tag_names[:5])}")
+
             # Build HTML & publish
             html = build_html(
                 content, images, story, focus_keyword, meta_description,
@@ -209,6 +219,7 @@ class DailyNewsPipeline(Pipeline):
                 seo_title, html, category_id, featured_id,
                 meta_description=meta_description,
                 focus_keyword=focus_keyword,
+                tags=tag_ids,
                 author_id=category.get("author_id"),
                 unsplash_id=unsplash_id,
                 source_url=story.get("url"),

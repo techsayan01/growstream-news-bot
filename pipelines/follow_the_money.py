@@ -6,7 +6,7 @@ from datetime import datetime
 
 from agents.researcher import fetch_from_feeds
 from content.images import fetch_unsplash_images
-from content.seo import generate_focus_keyword, generate_meta_description, generate_seo_title
+from content.seo import generate_focus_keyword, generate_meta_description, generate_seo_title, generate_tags
 from core.llm import call_llm
 from core.retry import with_retry
 from core.utils import log
@@ -132,13 +132,18 @@ class FollowTheMoneyPipeline(Pipeline):
                 featured_id = uploaded["id"]
                 unsplash_id = images[0].get("unsplash_id")
 
+        tag_names = generate_tags(story["headline"], focus_kw, "investment funding")
+        tag_ids   = self.wp.get_or_create_tags(tag_names)
+
         post_url = self.wp.publish(
-            title=f"💰 Follow the Money: {seo_title}",
+            title=f"Follow the Money: {seo_title}",
             html_content=content,
             category_id=category_id,
             featured_image_id=featured_id,
             meta_description=meta,
             focus_keyword=focus_kw,
+            tags=tag_ids,
+            author_id=3,   # Alex Chen — investment/funding content
             unsplash_id=unsplash_id,
         )
         if post_url:

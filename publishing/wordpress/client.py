@@ -170,6 +170,47 @@ class WordPressClient(Publisher):
                     log.error(f"  ✗ Could not fetch category '{slug}': {e}")
         return None
 
+    def get_or_create_tags(self, tag_names: list[str]) -> list[int]:
+        """Convert a list of tag name strings into WordPress tag IDs.
+
+        Creates any tags that don't already exist. Returns a list of IDs.
+        """
+        tag_ids: list[int] = []
+        for name in tag_names:
+            if not name:
+                continue
+            try:
+                # Search for existing tag
+                r = requests.get(
+                    f"{self.wp_url}/wp-json/wp/v2/tags",
+                    headers=self._auth_header(),
+                    params={"search": name, "per_page": 1},
+                    timeout=REQUEST_TIMEOUT,
+                )
+                r.raise_for_status()
+                results = r.json()
+                if results:
+                    tag_ids.append(results[0]["id"])
+                    continue
+                # Create new tag
+                rc = requests.post(
+                    f"{self.wp_url}/wp-json/wp/v2/tags",
+                    headers=self._auth_header(),
+                    json={"name": name},
+                    timeout=REQUEST_TIMEOUT,
+                )
+                if rc.status_code == 201:
+                    tag_ids.append(rc.json()["id"])
+                elif rc.status_code == 400:
+                    # Tag may exist under a slightly different slug — fetch it
+                    data = rc.json()
+                    existing_id = data.get("data", {}).get("term_id")
+                    if existing_id:
+                        tag_ids.append(existing_id)
+            except Exception as e:
+                log.warning(f"  ⚠ Tag '{name}' skipped: {e}")
+        return tag_ids
+
     def get_or_create_category(self, name: str, slug: str) -> int | None:
         cat_id = self.get_category_id(slug)
         if cat_id:

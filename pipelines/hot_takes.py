@@ -9,6 +9,7 @@ from datetime import datetime
 
 from agents.researcher import fetch_from_feeds
 from content.images import fetch_unsplash_images
+from content.seo import generate_tags
 from core.llm import call_llm
 from core.retry import with_retry
 from core.utils import log, safe_json_parse
@@ -119,16 +120,49 @@ class HotTakesPipeline(Pipeline):
             log.error("  ✗ Hot take generation failed")
             return
 
-        today = datetime.now().strftime("%B %d, %Y")
-        title = f"Hot Take: {story['headline']}"
+        today     = datetime.now().strftime("%B %d, %Y")
+        pub_date  = datetime.now().strftime("%Y-%m-%dT%H:%M:%S+00:00")
         import re as _re
         # Strip emojis from LLM-generated content
         content = _re.sub(r'[\U00010000-\U0010ffff]', '', content, flags=_re.UNICODE)
         content = _re.sub(r'[\U00002600-\U000027BF]', '', content, flags=_re.UNICODE)
-        # Slug must be clean ASCII so WordPress doesn't encode emojis in the URL
+
+        # Title: clean, max 60 chars, keep whole words
+        raw_title = f"Hot Take: {story['headline']}"
+        if len(raw_title) > 60:
+            words, buf = raw_title.split(), ""
+            for w in words:
+                if len(buf) + len(w) + 1 > 57:
+                    break
+                buf = (buf + " " + w).strip()
+            title = buf + "..."
+        else:
+            title = raw_title
+
+        # Slug must be clean ASCII
         slug = _re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:80]
 
-        html = f"""
+        # JSON-LD schema
+        headline_safe = story['headline'].replace('"', '\\"')[:110]
+        meta_text     = _re.sub(r'<[^>]+>', '', content).strip()[:155]
+        schema = f"""<script type="application/ld+json">
+{{
+  "@context": "https://schema.org",
+  "@type": "NewsArticle",
+  "headline": "{headline_safe}",
+  "description": "{meta_text.replace('"', '\\"')}",
+  "datePublished": "{pub_date}",
+  "dateModified": "{pub_date}",
+  "publisher": {{
+    "@type": "Organization",
+    "name": "{self.site.display_name}",
+    "url": "{self.site.site_url}"
+  }},
+  "keywords": "hot take finance, fintech, {story.get('source','')}"
+}}
+</script>"""
+
+        html = schema + f"""
 <div style="background:#f8f9fa;border-left:4px solid #007bff;padding:24px 28px;border-radius:8px;margin-bottom:24px;">
   <p style="font-size:0.8em;text-transform:uppercase;letter-spacing:2px;color:#6c757d;margin-top:0;">{self.site.display_name} Hot Take &middot; {today}</p>
   {content}
@@ -148,14 +182,23 @@ class HotTakesPipeline(Pipeline):
                 featured_id = uploaded["id"]
                 unsplash_id = images[0].get("unsplash_id")
 
+        tag_names = generate_tags(story["headline"], "hot take finance", "fintech", )
+        tag_ids   = self.wp.get_or_create_tags(tag_names)
+
+        meta_description = (
+            _re.sub(r'<[^>]+>', '', content).strip()[:152] + "..."
+        )
+
         post_url = self.wp.publish(
             title=title,
             slug=slug,
             html_content=html,
             category_id=category_id,
             featured_image_id=featured_id,
-            meta_description=f"{self.site.display_name}'s hot take on: {story['headline'][:120]}",
+            meta_description=meta_description,
             focus_keyword="hot take finance",
+            tags=tag_ids,
+            author_id=4,   # Priya Mehta — opinion content
             unsplash_id=unsplash_id,
         )
         if post_url:

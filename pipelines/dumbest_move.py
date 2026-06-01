@@ -7,7 +7,7 @@ from datetime import datetime
 
 from agents.researcher import fetch_from_feeds
 from content.images import fetch_unsplash_images
-from content.seo import generate_meta_description
+from content.seo import generate_meta_description, generate_tags
 from core.llm import call_llm
 from core.retry import with_retry
 from core.utils import log, safe_json_parse
@@ -168,6 +168,12 @@ class DumbestMovePipeline(Pipeline):
                 featured_id = uploaded["id"]
                 unsplash_id = images[0].get("unsplash_id")
 
+        tag_names = generate_tags(
+            story["headline"], "ai finance accountability", "fintech",
+            named_entities=[story.get("_dm_decision_maker", "")]
+        )
+        tag_ids = self.wp.get_or_create_tags(tag_names)
+
         post_url = self.wp.publish(
             title=title,
             html_content=content,
@@ -175,6 +181,8 @@ class DumbestMovePipeline(Pipeline):
             featured_image_id=featured_id,
             meta_description=meta,
             focus_keyword="ai finance accountability",
+            tags=tag_ids,
+            author_id=4,   # Priya Mehta — accountability/opinion content
             unsplash_id=unsplash_id,
         )
         if post_url:

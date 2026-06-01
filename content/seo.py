@@ -1,12 +1,14 @@
 """
-SEO metadata generation — focus keyword, SEO title, meta description.
+SEO metadata generation — focus keyword, SEO title, meta description, tags.
 
-Uses the SEO Specialist persona (quick Haiku calls).
+Uses the SEO Specialist persona (quick Flash calls).
 """
+
+import json
 
 from core.llm import call_llm
 from core.retry import with_retry
-from core.utils import log
+from core.utils import log, safe_json_parse
 
 _PERSONA_SEO = """\
 You are an expert SEO strategist with 10+ years optimising financial and B2B content.
@@ -62,3 +64,41 @@ def generate_meta_description(title: str, content: str, focus_keyword: str) -> s
     if len(desc) > 160:
         desc = desc[:157] + "..."
     return desc
+
+
+@with_retry(max_retries=2, delay=3, fallback=list)
+def generate_tags(
+    headline: str,
+    focus_keyword: str,
+    market_trend: str,
+    named_entities: list[str] | None = None,
+) -> list[str]:
+    """Generate 6–10 WordPress tags for the article.
+
+    Returns a list of lowercase tag strings ready to pass to the WP API.
+    Tags cover: topic keywords, company names, macro trends, and article type signals.
+    """
+    entities_hint = ""
+    if named_entities:
+        entities_hint = f"Named entities in the article: {', '.join(named_entities[:8])}. Include the most important ones as tags."
+
+    raw = call_llm("gemini-2.5-flash", 150, [{"role": "user", "content": (
+        f"{_PERSONA_SEO}\n\n"
+        f"Generate 6–10 WordPress tags for this finance article.\n"
+        f"Headline: {headline}\n"
+        f"Focus keyword: {focus_keyword}\n"
+        f"Market trend: {market_trend}\n"
+        f"{entities_hint}\n\n"
+        f"Rules:\n"
+        f"- Tags must be specific and searchable (e.g. 'fintech funding', 'gemini ai', 'rbi regulation')\n"
+        f"- Include the focus keyword as one tag\n"
+        f"- Include the market trend as one tag\n"
+        f"- All lowercase, no special characters\n"
+        f"- No generic tags like 'news', 'finance', 'article'\n"
+        f"Return ONLY a JSON array of strings: [\"tag1\", \"tag2\", ...]"
+    )}])
+
+    tags = safe_json_parse(raw)
+    if isinstance(tags, list):
+        return [str(t).lower().strip() for t in tags if t][:10]
+    return []
