@@ -9,7 +9,7 @@ from datetime import datetime
 
 from agents.researcher import fetch_from_feeds
 from content.images import fetch_unsplash_images
-from content.seo import generate_tags
+from content.seo import generate_focus_keyword, generate_tags
 from core.llm import call_llm
 from core.retry import with_retry
 from core.utils import log, safe_json_parse
@@ -71,7 +71,14 @@ Story:
 Headline: {story['headline']}
 Summary: {story['summary'][:500]}"""
 
+    import re as _md
     content = call_llm("gemini-2.5-flash", 300, [{"role": "user", "content": prompt}]).strip()
+
+    # Convert residual markdown formatting to HTML
+    content = _md.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', content)
+    content = _md.sub(r'\*(.+?)\*',     r'<em>\1</em>',         content)
+    content = _md.sub(r'_(.+?)_',       r'<em>\1</em>',         content)
+
     if not content.startswith("<p"):
         content = f"<p>{content}</p>"
     return content
@@ -142,6 +149,9 @@ class HotTakesPipeline(Pipeline):
         # Slug must be clean ASCII
         slug = _re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:80]
 
+        # Generate focus keyword before building schema
+        focus_keyword = generate_focus_keyword(story["headline"], "Hot Takes")
+
         # JSON-LD schema
         headline_safe = story['headline'].replace('"', '\\"')[:110]
         meta_text     = _re.sub(r'<[^>]+>', '', content).strip()[:155]
@@ -158,7 +168,7 @@ class HotTakesPipeline(Pipeline):
     "name": "{self.site.display_name}",
     "url": "{self.site.site_url}"
   }},
-  "keywords": "hot take finance, fintech, {story.get('source','')}"
+  "keywords": "{focus_keyword}, fintech, {story.get('source','')}"
 }}
 </script>"""
 
@@ -182,8 +192,8 @@ class HotTakesPipeline(Pipeline):
                 featured_id = uploaded["id"]
                 unsplash_id = images[0].get("unsplash_id")
 
-        tag_names = generate_tags(story["headline"], "hot take finance", "fintech", )
-        tag_ids   = self.wp.get_or_create_tags(tag_names)
+        tag_names = generate_tags(story["headline"], focus_keyword, "fintech")
+        tag_ids       = self.wp.get_or_create_tags(tag_names)
 
         meta_description = (
             _re.sub(r'<[^>]+>', '', content).strip()[:152] + "..."
@@ -196,7 +206,7 @@ class HotTakesPipeline(Pipeline):
             category_id=category_id,
             featured_image_id=featured_id,
             meta_description=meta_description,
-            focus_keyword="hot take finance",
+            focus_keyword=focus_keyword,
             tags=tag_ids,
             author_id=4,   # Priya Mehta — opinion content
             unsplash_id=unsplash_id,
