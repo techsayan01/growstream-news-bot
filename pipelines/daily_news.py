@@ -11,6 +11,8 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
+import json as _json
+
 from agents.classifier import classify_story
 from agents.editor import review_article
 from agents.factchecker import factcheck_story
@@ -19,8 +21,48 @@ from agents.researcher import research_agent
 from agents.writer import write_article
 from content.images import fetch_unsplash_images
 from content.seo import generate_focus_keyword, generate_meta_description, generate_seo_title, generate_tags
-from core.db import mark_raw_story_processed
-from core.utils import log
+from core.db import get_recent_articles_for_linking, mark_raw_story_processed
+from core.llm import call_llm
+from core.utils import log, safe_json_parse
+
+
+def _pick_related_articles(headline: str, focus_keyword: str, category: str) -> list[dict]:
+    """Use Gemini Flash to pick the 3 most relevant published articles for internal linking."""
+    candidates = get_recent_articles_for_linking(days=60)
+    if not candidates:
+        return []
+
+    candidate_list = _json.dumps(
+        [{"index": i, "title": a["title"], "category": a.get("category", ""),
+          "keyword": a.get("focus_keyword", "")}
+         for i, a in enumerate(candidates)],
+        indent=2,
+    )
+
+    prompt = f"""You are an SEO editor. Pick the 3 most topically relevant articles for internal linking.
+
+Current article:
+- Headline: {headline}
+- Focus keyword: {focus_keyword}
+- Category: {category}
+
+Candidate articles:
+{candidate_list}
+
+Return ONLY a JSON array of 3 indexes (most relevant first): [2, 7, 1]
+Choose articles that cover related but distinct topics — avoid picking articles that are about the exact same story."""
+
+    try:
+        raw    = call_llm("gemini-2.5-flash", 60, [{"role": "user", "content": prompt}])
+        result = safe_json_parse(raw)
+        if isinstance(result, list):
+            return [candidates[i] for i in result[:3] if isinstance(i, int) and i < len(candidates)]
+    except Exception:
+        pass
+
+    # Fallback: return 3 most recent from same category
+    same_cat = [a for a in candidates if a.get("category") == category]
+    return (same_cat or candidates)[:3]
 from pipelines.base import Pipeline
 from publishing.wordpress.client import WordPressClient
 from publishing.wordpress.html import build_html
@@ -196,11 +238,17 @@ class DailyNewsPipeline(Pipeline):
             tag_ids = self.wp.get_or_create_tags(tag_names)
             log.info(f"  🏷  Tags: {', '.join(tag_names[:5])}")
 
+            # Select related articles for internal linking
+            related = _pick_related_articles(
+                story.get("headline", ""), focus_keyword, cat_name
+            )
+
             # Build HTML & publish
             html = build_html(
                 content, images, story, focus_keyword, meta_description,
                 publisher_name=self.site.display_name,
                 publisher_url=self.site.site_url,
+                related_articles=related,
             )
             category_id = self.wp.get_category_id(category["slug"])
 

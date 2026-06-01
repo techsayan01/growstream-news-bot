@@ -208,12 +208,12 @@ def log_published_article(
     focus_keyword: str,
     unsplash_id: str | None = None,
     source_url: str | None = None,
+    post_url: str | None = None,
     category: str | None = None,
     article_type: str | None = None,
     seo_score: int | None = None,
     quality_score: int | None = None,
 ) -> None:
-    from pymongo import ReplaceOne
     norm = normalise_headline(title)
     _db().published_articles.replace_one(
         {"_id": wp_post_id},
@@ -222,6 +222,7 @@ def log_published_article(
             "title":         title,
             "headline_norm": norm,
             "source_url":    source_url,
+            "post_url":      post_url,
             "focus_keyword": focus_keyword,
             "category":      category,
             "article_type":  article_type,
@@ -243,6 +244,32 @@ def log_published_article(
         }},
         upsert=True,
     )
+
+
+def get_recent_articles_for_linking(
+    days: int = 60,
+    exclude_id: int | None = None,
+    limit: int = 20,
+) -> list[dict]:
+    """Return recently published articles for internal link selection.
+
+    Excludes the article being currently built (exclude_id) and any without
+    a post_url (legacy records before post_url was tracked).
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    query: dict = {
+        "published_at": {"$gte": cutoff},
+        "post_url":     {"$exists": True, "$ne": None},
+    }
+    if exclude_id:
+        query["_id"] = {"$ne": exclude_id}
+
+    return list(_db().published_articles.find(
+        query,
+        {"title": 1, "post_url": 1, "focus_keyword": 1, "category": 1, "article_type": 1},
+        sort=[("published_at", -1)],
+        limit=limit,
+    ))
 
 
 def is_image_used(unsplash_id: str) -> bool:

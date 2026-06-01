@@ -364,9 +364,12 @@ class WordPressClient(Publisher):
                     post_url  = post_data.get("link", "")
                     log_published_article(
                         post_id, title, focus_keyword, unsplash_id,
-                        source_url=source_url, category=category,
+                        source_url=source_url,
+                        post_url=post_url,
+                        category=category,
                         article_type=article_type,
-                        seo_score=seo_score, quality_score=quality_score,
+                        seo_score=seo_score,
+                        quality_score=quality_score,
                     )
                     return post_url
                 elif r.status_code in (401, 403):
