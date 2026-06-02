@@ -238,13 +238,25 @@ class HotTakesPipeline(Pipeline):
                 )
 
         html = schema + hero_img_html + f"""
-<div style="background:#f8f9fa;border-left:4px solid #007bff;padding:24px 28px;border-radius:8px;margin-bottom:24px;">
-  <p style="font-size:0.8em;text-transform:uppercase;letter-spacing:2px;color:#6c757d;margin-top:0;">{self.site.display_name} Hot Take &middot; {today}</p>
+<div style="background:#EDF2F7;border-left:4px solid #E53E1A;padding:24px 28px;border-radius:8px;margin-bottom:24px;">
+  <p style="font-size:0.8em;text-transform:uppercase;letter-spacing:2px;color:#4A5568;margin-top:0;font-family:Helvetica Neue,Arial,sans-serif;">{self.site.display_name} Hot Take &middot; {today}</p>
   {content}
-  <p style="margin-bottom:0;font-size:0.8em;color:#6c757d;">Source: <a href="{story.get('url','#')}" style="color:#0056b3;" target="_blank" rel="noopener">{story.get('source','Unknown')}</a></p>
+  <p style="margin-bottom:0;font-size:0.8em;color:#718096;">Source: <a href="{story.get('url','#')}" style="color:#2B6CB0;" target="_blank" rel="noopener">{story.get('source','Unknown')}</a></p>
 </div>
-<h2>Why This Matters</h2>
+<h2 style="font-family:Helvetica Neue,Arial,sans-serif;color:#215387;border-bottom:2px solid #E53E1A;padding-bottom:8px;">Why This Matters</h2>
 {context}
+
+<div style="margin-top:36px;padding-top:20px;border-top:1px solid #EDF2F7;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:40px;height:4px;background:#E53E1A;border-radius:2px;"></div>
+    <span style="font-family:Helvetica Neue,Arial,sans-serif;font-size:0.8em;text-transform:uppercase;letter-spacing:2px;color:#718096;">End of article</span>
+    <div style="flex:1;height:1px;background:#EDF2F7;"></div>
+  </div>
+  <p style="margin:8px 0 0;font-size:0.85em;color:#718096;font-family:Helvetica Neue,Arial,sans-serif;">
+    Published by <a href="{self.site.site_url}" style="color:#2B6CB0;text-decoration:none;font-weight:600;">{self.site.display_name}</a>
+    &middot; {today}
+  </p>
+</div>
 """
 
         tag_names = generate_tags(story["headline"], focus_keyword, "fintech")
