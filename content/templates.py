@@ -9,48 +9,63 @@ Each entry exposes:
 Shared reusable HTML components are defined at the top.
 """
 
+# ── Brand colors ──────────────────────────────────────────────────────────────
+# From GrowStream logo + Kadence palette
+_BRAND_RED    = "#E53E1A"   # primary brand (logo)
+_BRAND_BLUE   = "#2B6CB0"   # links
+_DARK_BLUE    = "#215387"   # headings
+_NEAR_BLACK   = "#1A202C"   # body text
+_DARK_GREY    = "#2D3748"   # subheadings
+_MID_GREY     = "#4A5568"   # secondary text
+_LIGHT_GREY   = "#718096"   # captions
+_OFF_WHITE    = "#EDF2F7"   # backgrounds
+_WHITE        = "#F7FAFC"   # alt backgrounds
+_GREEN        = "#13612e"   # winner
+_RED          = "#b82105"   # loser
+
 # ── Shared components ─────────────────────────────────────────────────────────
 
-_STAT_CALLOUT = """<div style="background:#e8f4fd;border-left:4px solid #0056b3;padding:16px 20px;border-radius:6px;margin:20px 0;">
-  <span style="font-size:2em;font-weight:700;color:#0056b3;">[KEY STAT OR FIGURE]</span>
-  <p style="margin:6px 0 0;color:#333;font-size:0.95em;">[One-line label explaining the stat]</p>
+_STAT_CALLOUT = f"""<div style="background:{_OFF_WHITE};border-left:4px solid {_BRAND_RED};padding:16px 20px;border-radius:6px;margin:20px 0;">
+  <span style="font-size:2em;font-weight:700;color:{_BRAND_RED};">[KEY STAT OR FIGURE]</span>
+  <p style="margin:6px 0 0;color:{_NEAR_BLACK};font-size:0.95em;">[One-line label explaining the stat]</p>
 </div>"""
 
-_SUMMARY_BOX = """<div style="background:#f8f9fa;padding:16px 20px;border-left:4px solid #007bff;border-radius:6px;margin-bottom:20px;">
-  <h3 style="margin-top:0;">15 Sec Read</h3>
-  <ul>
-    <li>[Core news — what happened]</li>
-    <li>[Why it matters — the implication]</li>
-    <li>[Impact — who wins, who loses, or what changes]</li>
+_SUMMARY_BOX = f"""<div style="background:{_OFF_WHITE};padding:20px 24px;border-left:4px solid {_BRAND_RED};border-radius:6px;margin-bottom:24px;">
+  <h3 style="margin-top:0;font-family:Helvetica Neue,Arial,sans-serif;font-size:0.85em;text-transform:uppercase;letter-spacing:2px;color:{_MID_GREY};">Key Takeaways</h3>
+  <ul style="margin:8px 0 0;padding-left:1.2em;">
+    <li style="margin-bottom:8px;">[Core news — what happened, in one sentence]</li>
+    <li style="margin-bottom:8px;">[Why it matters — the direct implication for finance professionals]</li>
+    <li style="margin-bottom:8px;">[Impact — who wins, who loses, or what changes in the market]</li>
+    <li>[What to do — one actionable next step for CFOs/investors]</li>
   </ul>
 </div>"""
 
-_WINNER_LOSER = """<div style="display:flex;gap:16px;margin-bottom:24px;">
-  <div style="flex:1;background:#d4edda;border-left:4px solid #28a745;padding:14px;border-radius:6px;">
-    <strong style="color:#155724;">Winner</strong>
-    <p style="margin:6px 0 0;color:#155724;">[Entity that benefits most — one punchy sentence]</p>
+_WINNER_LOSER = f"""<div style="display:flex;gap:16px;margin-bottom:24px;">
+  <div style="flex:1;background:#e8f5e9;border-left:4px solid {_GREEN};padding:14px;border-radius:6px;">
+    <strong style="color:{_GREEN};font-family:Helvetica Neue,Arial,sans-serif;font-size:0.85em;text-transform:uppercase;letter-spacing:1px;">Winner</strong>
+    <p style="margin:6px 0 0;color:{_NEAR_BLACK};">[Entity that benefits most — one punchy sentence]</p>
   </div>
-  <div style="flex:1;background:#f8d7da;border-left:4px solid #dc3545;padding:14px;border-radius:6px;">
-    <strong style="color:#721c24;">Loser</strong>
-    <p style="margin:6px 0 0;color:#721c24;">[Entity most exposed — one punchy sentence]</p>
+  <div style="flex:1;background:#fce4ec;border-left:4px solid {_RED};padding:14px;border-radius:6px;">
+    <strong style="color:{_RED};font-family:Helvetica Neue,Arial,sans-serif;font-size:0.85em;text-transform:uppercase;letter-spacing:1px;">Loser</strong>
+    <p style="margin:6px 0 0;color:{_NEAR_BLACK};">[Entity most exposed — one punchy sentence]</p>
   </div>
 </div>"""
 
-_BOTTOM_LINE = """<h2>The Bottom Line</h2>
-<div style="background:#e9ecef;padding:20px;border-radius:8px;margin:30px 0;">
-  <p style="margin:0;"><strong>[Single most important takeaway ~80 words. Include the focus keyword here.]</strong></p>
+_BOTTOM_LINE = f"""<h2>The Bottom Line</h2>
+<div style="background:{_OFF_WHITE};border-top:3px solid {_BRAND_RED};padding:20px 24px;border-radius:0 0 8px 8px;margin:30px 0;">
+  <p style="margin:0;font-size:1.05em;"><strong>[Single most important takeaway ~80 words. Include the focus keyword here.]</strong></p>
 </div>"""
 
 _FAQ = """<h3>Frequently Asked Questions</h3>
 <h4>[Question 1 relevant to this story?]</h4>
-<p>[Genuine answer, 40–60 words — not filler.]</p>
+<p>[Genuine answer, 40-60 words - not filler.]</p>
 <h4>[Question 2?]</h4>
-<p>[Genuine answer, 40–60 words.]</p>
+<p>[Genuine answer, 40-60 words.]</p>
 <h4>[Question 3?]</h4>
-<p>[Genuine answer, 40–60 words.]</p>"""
+<p>[Genuine answer, 40-60 words.]</p>"""
 
-_ACTION_CHECKLIST = """<div style="background:#fff3cd;border-left:4px solid #ffc107;padding:16px 20px;border-radius:6px;margin:20px 0;">
-  <strong>What Finance Leaders Should Do Now</strong>
+_ACTION_CHECKLIST = f"""<div style="background:#fff8e1;border-left:4px solid #f5a524;padding:16px 20px;border-radius:6px;margin:20px 0;">
+  <strong style="font-family:Helvetica Neue,Arial,sans-serif;color:{_NEAR_BLACK};">What Finance Leaders Should Do Now</strong>
   <ul style="margin:8px 0 0;">
     <li>[Specific action item 1]</li>
     <li>[Specific action item 2]</li>

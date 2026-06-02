@@ -13,7 +13,7 @@ import json
 import re
 from datetime import datetime
 
-from core.utils import strip_emojis
+from core.utils import clean_meta_text, strip_emojis
 
 
 # ── Newspaper style CSS (injected once at top of each article) ────────────────
@@ -66,6 +66,78 @@ _NEWSPAPER_STYLE = """<style>
 .gs-article td { padding: 10px 14px; border-bottom: 1px solid #EDF2F7; }
 .gs-article tr:nth-child(even) td { background: #F7FAFC; }
 </style>
+"""
+
+
+# ── Executive summary (auto-generated for long articles) ──────────────────────
+
+def _build_executive_summary(content: str, headline: str) -> str:
+    """Auto-extract key points from article HTML for an executive summary box.
+
+    Only generated for articles over 800 words. Extracts bullet points from:
+    1. Text inside the Key Takeaways box (if present)
+    2. First sentence of each H2 section
+    3. Any stat callout figures
+
+    Returns empty string for short articles.
+    """
+    plain = re.sub(r'<[^>]+>', ' ', content)
+    plain = re.sub(r'\s+', ' ', plain).strip()
+    words = len(plain.split())
+
+    if words < 800:
+        return ""
+
+    bullets = []
+
+    # Extract first sentence after each H2
+    h2_sections = re.split(r'<h2[^>]*>', content)
+    for section in h2_sections[1:]:  # skip content before first H2
+        # Get heading text
+        heading_match = re.match(r'(.*?)</h2>', section, re.S)
+        if not heading_match:
+            continue
+        heading = clean_meta_text(heading_match.group(1)).strip()
+        # Skip FAQ, Bottom Line, Related headings
+        if any(skip in heading.lower() for skip in ['faq', 'frequently', 'bottom line', 'related']):
+            continue
+        # Get first sentence after the heading
+        after_heading = section[heading_match.end():]
+        first_p = re.search(r'<p[^>]*>(.*?)</p>', after_heading, re.S)
+        if first_p:
+            sentence = clean_meta_text(first_p.group(1))
+            # Take first sentence only
+            end = re.search(r'[.!?](?:\s|$)', sentence)
+            if end:
+                sentence = sentence[:end.end()].strip()
+            if len(sentence) > 30 and len(sentence) < 200:
+                bullets.append(f"<strong>{heading}:</strong> {sentence}")
+        if len(bullets) >= 5:
+            break
+
+    # Extract stat callout figures
+    stats = re.findall(
+        r'<span style="font-size:2em[^"]*">([^<]+)</span>',
+        content, re.I,
+    )
+    if stats:
+        stat_text = ", ".join(s.strip() for s in stats[:3])
+        bullets.insert(0, f"<strong>Key figures:</strong> {stat_text}")
+
+    if len(bullets) < 2:
+        return ""
+
+    items = "\n".join(f'    <li style="margin-bottom:10px;line-height:1.5;">{b}</li>' for b in bullets[:6])
+
+    return f"""
+<div style="background:#F7FAFC;border:1px solid #EDF2F7;border-top:3px solid #E53E1A;padding:24px 28px;border-radius:0 0 8px 8px;margin:0 0 32px;">
+  <h3 style="margin-top:0;font-family:Helvetica Neue,Arial,sans-serif;font-size:0.85em;text-transform:uppercase;letter-spacing:2px;color:#E53E1A;">Executive Summary</h3>
+  <p style="margin:0 0 12px;font-size:0.9em;color:#718096;font-family:Helvetica Neue,Arial,sans-serif;">
+    {words:,} words &middot; {max(1, words // 250)} min read</p>
+  <ul style="margin:0;padding-left:1.2em;color:#1A202C;">
+{items}
+  </ul>
+</div>
 """
 
 
@@ -283,12 +355,15 @@ def build_html(
         source_url=story.get("url", ""),
     )
 
+    # ── Executive summary (auto-generated for 800+ word articles) ───────────
+    exec_summary = _build_executive_summary(body, headline)
+
     # ── Assemble ──────────────────────────────────────────────────────────────
     final = (
         news_schema + faq_schema +
         _NEWSPAPER_STYLE +
         '<div class="gs-article">' +
-        badge + body + related_section + footer +
+        badge + exec_summary + body + related_section + footer +
         '</div>'
     )
     return strip_emojis(final)
