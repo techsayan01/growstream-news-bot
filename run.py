@@ -47,6 +47,7 @@ _PIPELINE_NAMES = [
     "follow_the_money",
     "dumbest_move",
     "leaderboards",
+    "evergreen",
     "social",
 ]
 
@@ -69,6 +70,9 @@ def _run_pipeline(pipeline_name: str, site: SiteConfig, **kwargs) -> None:
         run(site)
     elif pipeline_name == "leaderboards":
         from pipelines.leaderboards import run
+        run(site)
+    elif pipeline_name == "evergreen":
+        from pipelines.evergreen import run
         run(site)
     elif pipeline_name == "social":
         from pipelines.social import run

@@ -204,7 +204,9 @@ Rules:
 {extra_rules}
 Return ONLY the article HTML body."""
 
-    content = call_llm_with_fallback(_WRITER_MODELS, 4096, [{"role": "user", "content": prompt}]).strip()
+    # Explainers are longer — give more output tokens to avoid truncation
+    max_tokens = 6000 if article_type == "explainer" else 4096
+    content = call_llm_with_fallback(_WRITER_MODELS, max_tokens, [{"role": "user", "content": prompt}]).strip()
 
     # Strip markdown fences if the LLM wraps the HTML
     if content.startswith("```html"):

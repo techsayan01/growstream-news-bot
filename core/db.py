@@ -278,6 +278,50 @@ def is_image_used(unsplash_id: str) -> bool:
     return bool(_db().published_articles.find_one({"unsplash_id": unsplash_id}, {"_id": 1}))
 
 
+# ── Evergreen topic queue ─────────────────────────────────────────────────────
+
+def seed_evergreen_topics(topics: list[dict]) -> int:
+    """Insert topics that don't already exist. Returns count of new inserts."""
+    from pymongo.errors import DuplicateKeyError
+    inserted = 0
+    for t in topics:
+        try:
+            _db().evergreen_topics.insert_one({
+                "_id":        t["slug"],
+                "topic":      t["topic"],
+                "keyword":    t["keyword"],
+                "category":   t.get("category", "Fintech Explainers"),
+                "status":     "pending",
+                "published_at": None,
+                "post_url":   None,
+            })
+            inserted += 1
+        except DuplicateKeyError:
+            pass
+    return inserted
+
+
+def get_next_evergreen_topic() -> dict | None:
+    """Return the next pending topic, oldest first."""
+    return _db().evergreen_topics.find_one({"status": "pending"})
+
+
+def mark_evergreen_topic_published(slug: str, post_url: str) -> None:
+    _db().evergreen_topics.update_one(
+        {"_id": slug},
+        {"$set": {"status": "published", "published_at": datetime.now(timezone.utc),
+                  "post_url": post_url}},
+    )
+
+
+def get_evergreen_queue_status() -> dict:
+    """Return count of pending vs published topics."""
+    total     = _db().evergreen_topics.count_documents({})
+    pending   = _db().evergreen_topics.count_documents({"status": "pending"})
+    published = _db().evergreen_topics.count_documents({"status": "published"})
+    return {"total": total, "pending": pending, "published": published}
+
+
 # ── Social queue DAOs ─────────────────────────────────────────────────────────
 
 def get_pending_social_posts() -> list[dict]:

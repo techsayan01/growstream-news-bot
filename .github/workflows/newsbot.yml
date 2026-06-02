@@ -10,6 +10,7 @@ on:
     - cron: '30 4 * * 2,4'   # 10:00 IST Tue/Thu     — translated
     - cron: '30 3 * * 0'     # 09:00 IST Sunday      — dumbest_move
     - cron: '0 4 1 * *'      # 09:30 IST 1st of month — leaderboards
+    - cron: '30 1 * * 2,5'  # 07:00 IST Tue/Fri      — evergreen
 
   # Manual trigger — pick any pipeline from the dropdown
   workflow_dispatch:
@@ -26,6 +27,7 @@ on:
           - translated
           - dumbest_move
           - leaderboards
+          - evergreen
           - social
 
 concurrency:
@@ -77,6 +79,8 @@ jobs:
               echo "pipeline=dumbest_move"     >> $GITHUB_OUTPUT
             elif [ "$HOUR" = "04" ] && [ "$MIN" = "00" ] && [ "$DAY" = "01" ]; then
               echo "pipeline=leaderboards"     >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "01" ] && [ "$MIN" = "30" ] && echo "25" | grep -q "$DOW"; then
+              echo "pipeline=evergreen"        >> $GITHUB_OUTPUT
             else
               echo "pipeline=daily_news"       >> $GITHUB_OUTPUT
             fi
