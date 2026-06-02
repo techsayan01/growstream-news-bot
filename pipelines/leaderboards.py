@@ -60,7 +60,7 @@ Instructions:
 - Write a 700-900 word article using this structure:
 
 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 12px; margin-bottom: 28px;">
-  <h2 style="margin-top: 0; color: white;">📊 Top 10 {topic}</h2>
+  <h2 style="margin-top: 0; color: white;">Top 10 {topic}</h2>
   <p style="margin-bottom: 0; color: #e2d9f3;">[Month Year] Edition · GrowStream Media</p>
 </div>
 

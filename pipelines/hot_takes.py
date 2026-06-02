@@ -12,7 +12,7 @@ from content.images import fetch_unsplash_images
 from content.seo import generate_focus_keyword, generate_tags
 from core.llm import call_llm
 from core.retry import with_retry
-from core.utils import clean_meta_text, log, safe_json_parse
+from core.utils import clean_meta_text, log, safe_json_parse, strip_emojis
 from pipelines.base import Pipeline
 from publishing.wordpress.client import WordPressClient
 from sites.base import SiteConfig
@@ -169,8 +169,7 @@ class HotTakesPipeline(Pipeline):
         pub_date  = datetime.now().strftime("%Y-%m-%dT%H:%M:%S+00:00")
         import re as _re
         # Strip emojis from LLM-generated content
-        content = _re.sub(r'[\U00010000-\U0010ffff]', '', content, flags=_re.UNICODE)
-        content = _re.sub(r'[\U00002600-\U000027BF]', '', content, flags=_re.UNICODE)
+        content = strip_emojis(content)
 
         # Title: clean, max 60 chars, keep whole words
         raw_title = f"Hot Take: {story['headline']}"
@@ -188,8 +187,7 @@ class HotTakesPipeline(Pipeline):
         slug = _re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:80]
 
         # Context block — adds ~150 words of factual analysis below the opinion
-        context = _write_context(story, focus_keyword)
-        context = _re.sub(r'[\U00010000-\U0010ffff]', '', context, flags=_re.UNICODE)
+        context = strip_emojis(_write_context(story, focus_keyword))
 
         # JSON-LD schema
         headline_safe = story['headline'].replace('"', '\\"')[:110]

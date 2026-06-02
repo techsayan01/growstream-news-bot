@@ -73,7 +73,7 @@ Write a 300-400 word humorous but fair accountability piece about this questiona
 
 Use this EXACT structure:
 
-<h2>🏆 This Week's Questionable Move</h2>
+<h2>This Week's Questionable Move</h2>
 One dramatic paragraph introducing {decision_maker} and what they did. Set the scene.
 
 <h2>The Full Story</h2>
@@ -89,7 +89,7 @@ One dramatic paragraph introducing {decision_maker} and what they did. Set the s
 3 bullet points. Practical alternatives.
 
 <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 16px; border-radius: 6px;">
-  <strong>📊 The Grade: [Give an A-F grade]</strong><br>
+  <strong>The Grade: [Give an A-F grade]</strong><br>
   [One sentence verdict]<br>
   <em>Better luck next week.</em>
 </div>
@@ -154,7 +154,7 @@ class DumbestMovePipeline(Pipeline):
             return
 
         week_str    = datetime.now().strftime("Week of %B %d, %Y")
-        title       = f"😬 Dumbest Move of the Week — {week_str}"
+        title       = f"Dumbest Move of the Week — {week_str}"
         meta        = generate_meta_description(title, content, "ai finance accountability")
         category_id = self.wp.get_or_create_category(_WP_CATEGORY_NAME, _WP_CATEGORY_SLUG)
         used_slugs  = self.wp.get_recent_featured_image_slugs(days=7)

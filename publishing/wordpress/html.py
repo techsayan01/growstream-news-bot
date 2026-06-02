@@ -13,6 +13,8 @@ import json
 import re
 from datetime import datetime
 
+from core.utils import strip_emojis
+
 
 # ── FAQ schema extraction ─────────────────────────────────────────────────────
 
@@ -151,7 +153,7 @@ def build_html(
     faq_schema = _faq_schema(faq_pairs)
 
     # ── Trend badge ───────────────────────────────────────────────────────────
-    badge = f'<p><strong>{trend}</strong></p>\n<hr/>\n'
+    badge = f'<p><strong>{strip_emojis(trend)}</strong></p>\n<hr/>\n'
 
     # ── Inline image helper ───────────────────────────────────────────────────
     def img_block(img: dict, is_hero: bool = False) -> str:
@@ -193,4 +195,6 @@ def build_html(
     # ── Related Reading section ───────────────────────────────────────────────
     related_section = build_related_section(related_articles or [])
 
-    return news_schema + faq_schema + badge + body + related_section
+    # Strip any emojis that leaked through from LLM output or templates
+    final = news_schema + faq_schema + badge + body + related_section
+    return strip_emojis(final)

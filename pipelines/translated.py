@@ -9,6 +9,7 @@ from agents.researcher import fetch_from_feeds
 from content.images import fetch_unsplash_images
 from content.seo import generate_meta_description, generate_tags
 from core.llm import call_llm
+from core.utils import strip_emojis
 from core.retry import with_retry
 from core.utils import log
 from pipelines.base import Pipeline
@@ -43,25 +44,26 @@ def _write_translation(story: dict) -> str | None:
 
 Your task: Write a witty, plain-English breakdown of this regulatory story for finance professionals.
 
-Format it EXACTLY like this (use these H2 headings):
+Format it EXACTLY like this (use these H2 headings — no emojis):
 
-<h2>📄 What They Said</h2>
+<h2>What They Said</h2>
 2 sentences summarising the official position in dry regulatory-speak (mock the tone slightly).
 
-<h2>🤔 What It Actually Means</h2>
+<h2>What It Actually Means</h2>
 2-3 paragraphs of plain English. Use a relatable analogy. Make it scannable.
 
-<h2>✅ What You Should Actually Do About It</h2>
+<h2>What You Should Actually Do About It</h2>
 3-5 bullet points. Practical, actionable.
 
-<h2>🧐 The Part They Buried</h2>
+<h2>The Part They Buried</h2>
 1 paragraph — the thing buried in paragraph 47 that actually matters.
 
-<h2>⚡ The Bottom Line</h2>
+<h2>The Bottom Line</h2>
 One punchy sentence. No jargon.
 
 Rules:
-- Total length: 500-700 words
+- Total length: 600-800 words
+- No emojis anywhere
 - Use wit but stay factual — do NOT invent details
 - Return ONLY the HTML body
 
@@ -109,9 +111,12 @@ class TranslatedPipeline(Pipeline):
         short_headline = story["headline"][:45]
         title          = f"We Read It So You Don't Have To: {short_headline}"
 
+        # Strip any emojis from LLM output
+        content = strip_emojis(content)
+
         intro = f"""
 <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 16px; border-radius: 6px; margin-bottom: 24px;">
-  <strong>⏱ {self.site.display_name} Translation Service</strong><br>
+  <strong>{self.site.display_name} Translation Service</strong><br>
   We waded through the jargon so you can skip straight to the part that matters.
   Original source: <a href="{story.get('url','#')}" target="_blank" rel="noopener">{story.get('source','Unknown')}</a>
 </div>

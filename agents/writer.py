@@ -52,68 +52,8 @@ Editorial quality standards (target 7+/10):
 - The article must be complete — never trail off mid-sentence or leave sections empty.
 """
 
-_ARTICLE_STRUCTURE = """
-[HOOK] One punchy opening sentence with the focus keyword. No heading above this.
 
-<div class="summary-box" style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 20px;">
-  <h3 style="margin-top: 0;">⏳ 15 Sec Read</h3>
-  <ul>
-    <li>Bullet point 1 summarizing the core news</li>
-    <li>Bullet point 2 explaining why it matters</li>
-    <li>Bullet point 3 detailing the impact on the market</li>
-  </ul>
-</div>
-
-<div style="display: flex; gap: 16px; margin-bottom: 24px;">
-  <div style="flex: 1; background-color: #d4edda; border-left: 4px solid #28a745; padding: 14px; border-radius: 6px;">
-    <strong style="color: #155724;">🏆 Winner</strong>
-    <p style="margin: 6px 0 0; color: #155724;">Name of the entity that benefits most — one punchy sentence why.</p>
-  </div>
-  <div style="flex: 1; background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 14px; border-radius: 6px;">
-    <strong style="color: #721c24;">📉 Loser</strong>
-    <p style="margin: 6px 0 0; color: #721c24;">Name of the entity most exposed — one punchy sentence why.</p>
-  </div>
-</div>
-
-<h2>What Happened</h2>
-2 paragraphs (~150 words total).
-
-<h2>Why It Matters for Finance Professionals</h2>
-2 paragraphs (~200 words total).
-
-<h2>Key Facts and Data Points</h2>
-Bullet list of 5–7 concrete facts, numbers, or quotes.
-
-<h2>Industry Context</h2>
-2 paragraphs (~150 words total).
-
-<h2>What Finance Leaders Should Watch</h2>
-2 paragraphs (~150 words total).
-
-<h2>Global Market Angles</h2>
-
-<h3>🌏 Asia</h3>
-~60 words. India (RBI, SEBI, HDFC, Paytm, Zerodha), China (PBOC, Alipay, Ant Group), Japan (FSA, SoftBank), Singapore (MAS).
-
-<h3>🌍 Europe</h3>
-~60 words. ECB, FCA, Bundesbank, Deutsche Bank, Revolut, Klarna, DORA/MiCA.
-
-<h3>🌎 United States</h3>
-~60 words. Fed, SEC, OCC, Goldman Sachs, JPMorgan, Stripe, Nasdaq.
-
-<h2>The Contrarian Take</h2>
-~80 words starting with "Here's what nobody's saying about this:"
-
-<h2>The Bottom Line</h2>
-<div class="bottom-line" style="background-color: #e9ecef; padding: 20px; border-radius: 8px; margin-top: 30px; margin-bottom: 30px;">
-  <p style="margin: 0;"><strong>The single most important takeaway (~80 words). Include the focus keyword here.</strong></p>
-</div>
-
-<h3>Frequently Asked Questions</h3>
-3 FAQ items:
-<h4>Question here?</h4>
-<p>Answer here (40–60 words).</p>
-"""
+# Old _ARTICLE_STRUCTURE removed — all templates now live in content/templates.py
 
 
 @with_retry(max_retries=3, delay=5)
@@ -195,11 +135,11 @@ Write an 800–1200 word SEO-optimised article using this EXACT structure:
 {structure}
 
 Rules:
-- Use the focus keyword in the first 100 words, at least one H2, and the conclusion.
+- Use the focus keyword EXACTLY 4-6 times total — no more. Place it in: the first 100 words, one H2 heading, and the conclusion. Do NOT repeat it in every section.
 - Write in HTML only. Allowed tags: h2, h3, h4, p, ul, li, ol, strong, em, blockquote, div, table, thead, tbody, tr, th, td.
 - Use <strong> on every key metric, percentage, dollar figure, and company name.
 - Preserve all styled div boxes and tables exactly as shown in the template — fill them with real content.
-- No <title> tag. No emojis. Start directly with the hook paragraph.
+- No <title> tag. No emojis anywhere. No Unicode symbols. Start directly with the hook paragraph.
 - Do NOT fabricate statistics, names, or figures not in the source material.
 {extra_rules}
 Return ONLY the article HTML body."""

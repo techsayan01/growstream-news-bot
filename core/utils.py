@@ -64,20 +64,38 @@ def headline_jaccard(a: str, b: str) -> float:
     return len(sa & sb) / len(sa | sb)
 
 
-def clean_meta_text(text: str) -> str:
-    """Strip HTML tags and decode HTML entities for use in meta descriptions and OG tags.
+def strip_emojis(text: str) -> str:
+    """Remove all Unicode emojis from text. Catches every emoji block."""
+    return re.sub(
+        "["
+        "\U0001F600-\U0001F64F"  # emoticons
+        "\U0001F300-\U0001F5FF"  # symbols & pictographs
+        "\U0001F680-\U0001F9FF"  # transport & map / supplemental
+        "\U0001FA00-\U0001FA9F"  # chess, extended-A
+        "\U0001FAA0-\U0001FAFF"  # extended-B
+        "\U00002600-\U000027BF"  # misc symbols (☀★✓✗✅❌⚡⏳📄🔥 etc.)
+        "\U0000FE00-\U0000FE0F"  # variation selectors
+        "\U0000200D"             # ZWJ
+        "]+",
+        "",
+        text,
+        flags=re.UNICODE,
+    )
 
-    Converts curly quotes, apostrophes, and other HTML entities to plain ASCII
-    so they don't show as &#8217; in WhatsApp/LinkedIn/Slack previews.
-    """
+
+def clean_meta_text(text: str) -> str:
+    """Strip HTML tags, decode entities, normalise quotes for social sharing."""
     import html
-    text = re.sub(r"<[^>]+>", " ", text)       # strip tags
-    text = html.unescape(text)                   # &#8217; → '
-    text = re.sub(r"[‘’]", "'", text) # curly single quotes → '
-    text = re.sub(r"[“”]", '"', text) # curly double quotes → "
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = html.unescape(text)
+    # Replace curly quotes/apostrophes/dashes with plain ASCII via codepoints
+    text = text.replace("\u2018", "'").replace("\u2019", "'")
+    text = text.replace("\u201c", '"').replace("\u201d", '"')
+    text = text.replace("\u2026", "...")
+    text = text.replace("\u2014", " - ").replace("\u2013", "-")
+    text = strip_emojis(text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
-
 
 def safe_json_parse(raw_text: str):
     """Strip markdown fences and parse JSON, using json-repair as fallback."""
