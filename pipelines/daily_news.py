@@ -119,7 +119,15 @@ class DailyNewsPipeline(Pipeline):
 
             # Step 3: Dedup check (Layers 3 already ran in researcher;
             # Layer 4 WordPress title search runs here as final safeguard)
-            focus_keyword = generate_focus_keyword(best_story.get("headline", ""), cat_name)
+            raw_kw = generate_focus_keyword(best_story.get("headline", ""), cat_name)
+            # Ensure keyword is broad enough to appear naturally in any finance article.
+            # If LLM returned a very niche term (company name only, single word, or >4 words),
+            # blend it with the category name for a more searchable, writable keyword.
+            kw_words = raw_kw.split()
+            if len(kw_words) == 1 or len(kw_words) > 4:
+                focus_keyword = f"{raw_kw} {cat_name.lower()}"[:50].strip()
+            else:
+                focus_keyword = raw_kw
             log.info(f"  🔑 Focus keyword: {focus_keyword}")
             if self.wp.article_exists(best_story.get("headline", "")):
                 log.warning(f"  ⚠ Skipping #{rank} — Layer 4 WP title match")
@@ -337,7 +345,7 @@ class DailyNewsPipeline(Pipeline):
         for r in results:
             log.info(
                 f"  [{r['category']}] Relevance:{r['score']}/10 | "
-                f"Viral:{r['virality']}/10 | SEO:{r['seo_score']}/10 | "
+                f"SEO:{r['seo_score']}/10 | "
                 f"Quality:{r['quality_score']}/10 | 📸{r['images']} imgs"
             )
             log.info(f"    {r['title'][:55]}…")
