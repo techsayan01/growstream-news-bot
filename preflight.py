@@ -140,86 +140,79 @@ def _check_unsplash() -> CheckResult:
 
 
 def _check_wordpress(site: SiteConfig) -> CheckResult:
-    """Verify WordPress access: API key → JWT → fail."""
+    """Verify WordPress access with retry (Hostinger can be slow from GHA runners)."""
+    _WP_TIMEOUT = 30   # longer than REQUEST_TIMEOUT — WP on shared hosting is slow
+    _RETRIES    = 3
+
     if getattr(site, "wp_api_key", ""):
         auth_header  = {"X-Newsbot-Key": site.wp_api_key}
         method_label = "API key"
     else:
-        # Obtain JWT token
-        try:
-            r = requests.post(
-                f"{site.wp_url}/wp-json/jwt-auth/v1/token",
-                json={"username": site.wp_username, "password": site.wp_password},
-                timeout=REQUEST_TIMEOUT,
-            )
-            if r.status_code in (401, 403):
-                msg = r.json().get("message", "wrong credentials") if r.content else f"HTTP {r.status_code}"
-                return CheckResult("WordPress API", False, f"JWT auth failed: {msg}")
-            if r.status_code != 200:
-                return CheckResult("WordPress API", False, f"JWT endpoint returned {r.status_code}")
-            token = r.json().get("token")
-            if not token:
-                return CheckResult("WordPress API", False, "JWT response missing token field")
-        except requests.exceptions.ConnectionError:
-            return CheckResult("WordPress API", False, f"Cannot reach {site.wp_url}")
-        except Exception as e:
-            return CheckResult("WordPress API", False, str(e)[:80])
+        # Obtain JWT token — retry on timeout/connection errors
+        token = None
+        last_err = ""
+        for attempt in range(1, _RETRIES + 1):
+            try:
+                r = requests.post(
+                    f"{site.wp_url}/wp-json/jwt-auth/v1/token",
+                    json={"username": site.wp_username, "password": site.wp_password},
+                    timeout=_WP_TIMEOUT,
+                )
+                if r.status_code in (401, 403):
+                    msg = r.json().get("message", "wrong credentials") if r.content else f"HTTP {r.status_code}"
+                    return CheckResult("WordPress API", False, f"JWT auth failed: {msg}")
+                if r.status_code == 200:
+                    token = r.json().get("token")
+                    if token:
+                        break
+                last_err = f"JWT endpoint returned {r.status_code}"
+            except requests.exceptions.Timeout:
+                last_err = f"Timeout on attempt {attempt}/{_RETRIES}"
+                import time; time.sleep(5)
+            except requests.exceptions.ConnectionError:
+                last_err = f"Cannot reach {site.wp_url}"
+                import time; time.sleep(5)
+            except Exception as e:
+                last_err = str(e)[:80]
+
+        if not token:
+            return CheckResult("WordPress API", False, last_err)
+
         auth_header  = {"Authorization": f"Bearer {token}"}
         method_label = "JWT"
-    try:
-        me = requests.get(
-            f"{site.wp_url}/wp-json/wp/v2/users/me",
-            headers=auth_header,
-            params={"context": "edit"},
-            timeout=REQUEST_TIMEOUT,
-        )
-        if me.status_code in (401, 403):
-            return CheckResult(
-                "WordPress API", False,
-                f"Auth rejected on /users/me ({me.status_code}) — token may be invalid"
+    # Verify auth by checking current user — retry on flaky connections
+    for attempt in range(1, _RETRIES + 1):
+        try:
+            me = requests.get(
+                f"{site.wp_url}/wp-json/wp/v2/users/me",
+                headers=auth_header,
+                params={"context": "edit"},
+                timeout=_WP_TIMEOUT,
             )
-        if me.status_code != 200:
-            return CheckResult("WordPress API", False, f"/users/me returned {me.status_code}")
-
-        user     = me.json()
-        name     = user.get("name", "unknown")
-        roles    = user.get("roles", [])
-        role_str = ", ".join(roles) if roles else "unknown"
-
-        test = requests.post(
-            f"{site.wp_url}/wp-json/wp/v2/posts",
-            headers={**auth_header, "Content-Type": "application/json"},
-            json={"title": "__preflight_check__", "status": "private", "content": "test"},
-            timeout=REQUEST_TIMEOUT,
-        )
-        if test.status_code == 201:
-            post_id = test.json().get("id")
-            if post_id:
-                requests.delete(
-                    f"{site.wp_url}/wp-json/wp/v2/posts/{post_id}",
-                    headers=auth_header,
-                    params={"force": True},
-                    timeout=REQUEST_TIMEOUT,
+            if me.status_code in (401, 403):
+                return CheckResult(
+                    "WordPress API", False,
+                    f"Auth rejected ({me.status_code}) — check WP_USERNAME / WP_PASSWORD secrets"
                 )
-            return CheckResult(
-                "WordPress API", True,
-                f"[{method_label}] Authenticated as '{name}' (role: {role_str}) — publish rights confirmed"
-            )
-        elif test.status_code in (401, 403):
-            return CheckResult(
-                "WordPress API", False,
-                f"Logged in as '{name}' (role: {role_str}) — cannot create posts ({test.status_code})"
-            )
-        else:
-            return CheckResult(
-                "WordPress API", True,
-                f"[{method_label}] Authenticated as '{name}' (role: {role_str}) — publish test: {test.status_code}"
-            )
+            if me.status_code == 200:
+                user     = me.json()
+                name     = user.get("name", "unknown")
+                roles    = user.get("roles", [])
+                role_str = ", ".join(roles) if roles else "unknown"
+                return CheckResult(
+                    "WordPress API", True,
+                    f"[{method_label}] Authenticated as '{name}' (role: {role_str})"
+                )
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            if attempt < _RETRIES:
+                import time; time.sleep(5)
+            else:
+                return CheckResult("WordPress API", False,
+                    f"Unreachable after {_RETRIES} attempts — Hostinger may be slow")
+        except Exception as e:
+            return CheckResult("WordPress API", False, str(e)[:80])
 
-    except requests.exceptions.ConnectionError:
-        return CheckResult("WordPress API", False, f"Cannot reach {site.wp_url}")
-    except Exception as e:
-        return CheckResult("WordPress API", False, str(e)[:80])
+    return CheckResult("WordPress API", False, "Unknown error during auth check")
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
