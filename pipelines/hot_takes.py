@@ -12,7 +12,7 @@ from content.images import fetch_unsplash_images
 from content.seo import generate_focus_keyword, generate_tags
 from core.llm import call_llm
 from core.retry import with_retry
-from core.utils import log, safe_json_parse
+from core.utils import clean_meta_text, log, safe_json_parse
 from pipelines.base import Pipeline
 from publishing.wordpress.client import WordPressClient
 from sites.base import SiteConfig
@@ -84,6 +84,41 @@ Summary: {story['summary'][:500]}"""
     return content
 
 
+@with_retry(max_retries=2, delay=5)
+def _write_context(story: dict, focus_keyword: str) -> str:
+    """Write a 150-200 word 'Why This Matters' context section.
+
+    Adds SEO substance below the punchy hot take to protect against
+    Google's thin-content penalty while keeping the format distinct.
+    """
+    prompt = f"""\
+You are Jordan Blake, Senior Financial Journalist at GrowStream Media.
+
+Write a 150-200 word "Why This Matters" context section for finance professionals.
+This sits BELOW a punchy hot take opinion paragraph — so this section should be
+factual and analytical, not opinionated. Complement, don't repeat.
+
+Rules:
+- Use 2 short paragraphs
+- Include the focus keyword "{focus_keyword}" once naturally
+- Mention concrete market context, trends, or figures from the source
+- No emojis. No markdown. Plain HTML only: <p> tags.
+- Do NOT repeat what the hot take already said
+- Return ONLY the two <p> tags, nothing else
+
+Story:
+Headline: {story['headline']}
+Summary: {story['summary'][:600]}"""
+
+    import re as _md
+    text = call_llm("gemini-2.5-flash", 400, [{"role": "user", "content": prompt}]).strip()
+    text = _md.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    text = _md.sub(r'\*(.+?)\*',     r'<em>\1</em>',         text)
+    if not text.startswith("<p"):
+        text = f"<p>{text}</p>"
+    return text
+
+
 class HotTakesPipeline(Pipeline):
     def __init__(self, site: SiteConfig):
         super().__init__(site)
@@ -127,6 +162,9 @@ class HotTakesPipeline(Pipeline):
             log.error("  ✗ Hot take generation failed")
             return
 
+        # Generate focus keyword early — needed for context block
+        focus_keyword = generate_focus_keyword(story["headline"], "Hot Takes")
+
         today     = datetime.now().strftime("%B %d, %Y")
         pub_date  = datetime.now().strftime("%Y-%m-%dT%H:%M:%S+00:00")
         import re as _re
@@ -149,8 +187,9 @@ class HotTakesPipeline(Pipeline):
         # Slug must be clean ASCII
         slug = _re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:80]
 
-        # Generate focus keyword before building schema
-        focus_keyword = generate_focus_keyword(story["headline"], "Hot Takes")
+        # Context block — adds ~150 words of factual analysis below the opinion
+        context = _write_context(story, focus_keyword)
+        context = _re.sub(r'[\U00010000-\U0010ffff]', '', context, flags=_re.UNICODE)
 
         # JSON-LD schema
         headline_safe = story['headline'].replace('"', '\\"')[:110]
@@ -172,32 +211,48 @@ class HotTakesPipeline(Pipeline):
 }}
 </script>"""
 
-        html = schema + f"""
-<div style="background:#f8f9fa;border-left:4px solid #007bff;padding:24px 28px;border-radius:8px;margin-bottom:24px;">
-  <p style="font-size:0.8em;text-transform:uppercase;letter-spacing:2px;color:#6c757d;margin-top:0;">{self.site.display_name} Hot Take &middot; {today}</p>
-  {content}
-  <p style="margin-bottom:0;font-size:0.8em;color:#6c757d;">Source: <a href="{story.get('url','#')}" style="color:#0056b3;" target="_blank" rel="noopener">{story.get('source','Unknown')}</a></p>
-</div>
-"""
-
         category_id = self.wp.get_or_create_category(_WP_CATEGORY_NAME, _WP_CATEGORY_SLUG)
         used_slugs  = self.wp.get_recent_featured_image_slugs(days=7)
         images      = fetch_unsplash_images(["finance opinion editorial"], "finance editorial dark", count=1, used_slugs=used_slugs)
 
-        featured_id = None
-        unsplash_id = None
+        featured_id  = None
+        unsplash_id  = None
+        hero_img_html = ""
         if images:
             uploaded = self.wp.upload_image(images[0], title)
             if uploaded:
                 featured_id = uploaded["id"]
                 unsplash_id = images[0].get("unsplash_id")
+                # Embed image in article body so it shows regardless of theme settings
+                img_url  = images[0]["url"]
+                img_alt  = f"{focus_keyword} — {story['headline'][:60]}"[:125]
+                photographer     = images[0].get("photographer", "Unsplash")
+                photographer_url = images[0].get("photographer_url", "https://unsplash.com")
+                hero_img_html = (
+                    f'<figure style="margin:0 0 24px;">'
+                    f'<img src="{img_url}" alt="{img_alt}" title="{img_alt}" '
+                    f'width="1200" height="630" loading="eager" decoding="async" '
+                    f'style="width:100%;height:auto;border-radius:8px;display:block;"/>'
+                    f'<figcaption style="font-size:12px;color:#6c757d;margin-top:6px;">'
+                    f'Photo by <a href="{photographer_url}" target="_blank" rel="noopener">{photographer}</a>'
+                    f' via <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a>'
+                    f'</figcaption></figure>'
+                )
+
+        html = schema + hero_img_html + f"""
+<div style="background:#f8f9fa;border-left:4px solid #007bff;padding:24px 28px;border-radius:8px;margin-bottom:24px;">
+  <p style="font-size:0.8em;text-transform:uppercase;letter-spacing:2px;color:#6c757d;margin-top:0;">{self.site.display_name} Hot Take &middot; {today}</p>
+  {content}
+  <p style="margin-bottom:0;font-size:0.8em;color:#6c757d;">Source: <a href="{story.get('url','#')}" style="color:#0056b3;" target="_blank" rel="noopener">{story.get('source','Unknown')}</a></p>
+</div>
+<h2>Why This Matters</h2>
+{context}
+"""
 
         tag_names = generate_tags(story["headline"], focus_keyword, "fintech")
         tag_ids       = self.wp.get_or_create_tags(tag_names)
 
-        meta_description = (
-            _re.sub(r'<[^>]+>', '', content).strip()[:152] + "..."
-        )
+        meta_description = clean_meta_text(content)[:152] + "..."
 
         post_url = self.wp.publish(
             title=title,

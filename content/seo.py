@@ -8,7 +8,7 @@ import json
 
 from core.llm import call_llm
 from core.retry import with_retry
-from core.utils import log, safe_json_parse
+from core.utils import clean_meta_text, log, safe_json_parse
 
 _PERSONA_SEO = """\
 You are an expert SEO strategist with 10+ years optimising financial and B2B content.
@@ -58,9 +58,11 @@ def generate_meta_description(title: str, content: str, focus_keyword: str) -> s
         f"Write a meta description of EXACTLY 150–155 characters for this article. "
         f"Must include the keyword '{focus_keyword}' naturally. "
         f"Must be compelling and end with a call to action. "
+        f"Use plain straight quotes only — no curly quotes or apostrophes. "
         f"Title: {title}. "
         f"Return ONLY the meta description — no quotes, no labels."
     )}]).strip()
+    desc = clean_meta_text(desc)
     if len(desc) > 160:
         desc = desc[:157] + "..."
     return desc

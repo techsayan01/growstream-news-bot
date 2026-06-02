@@ -64,6 +64,21 @@ def headline_jaccard(a: str, b: str) -> float:
     return len(sa & sb) / len(sa | sb)
 
 
+def clean_meta_text(text: str) -> str:
+    """Strip HTML tags and decode HTML entities for use in meta descriptions and OG tags.
+
+    Converts curly quotes, apostrophes, and other HTML entities to plain ASCII
+    so they don't show as &#8217; in WhatsApp/LinkedIn/Slack previews.
+    """
+    import html
+    text = re.sub(r"<[^>]+>", " ", text)       # strip tags
+    text = html.unescape(text)                   # &#8217; → '
+    text = re.sub(r"[‘’]", "'", text) # curly single quotes → '
+    text = re.sub(r"[“”]", '"', text) # curly double quotes → "
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
 def safe_json_parse(raw_text: str):
     """Strip markdown fences and parse JSON, using json-repair as fallback."""
     text = raw_text.strip()
