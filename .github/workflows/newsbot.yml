@@ -31,7 +31,9 @@ on:
           - social
 
 concurrency:
-  group: newsbot-${{ github.ref }}
+  # Each schedule slot gets its own group so they never block each other.
+  # workflow_dispatch runs share one group (prevents accidental double-trigger).
+  group: newsbot-${{ github.event.schedule || github.run_id }}
   cancel-in-progress: false   # never cancel a running publish job
 
 jobs:
