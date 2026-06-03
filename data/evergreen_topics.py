@@ -9,6 +9,36 @@ Run `python data/evergreen_topics.py` to seed/top-up the MongoDB queue.
 """
 
 TOPICS = [
+    # ── PRIORITY: Exact-match for Google Search Console queries ───────────────
+    # These queries are already getting impressions — publish these first
+    # to convert impressions → clicks.
+
+    {"slug": "best-ai-billing-providers-usage-based-billing",
+     "topic": "Best AI Billing Providers for Usage-Based Billing in 2026",
+     "keyword": "AI billing providers usage-based billing",
+     "category": "SME & Startup Finance",
+     "article_hint": "comparison"},
+
+    {"slug": "usage-based-billing-explained-cfo-guide",
+     "topic": "Usage-Based Billing Explained: The Complete CFO Guide",
+     "keyword": "usage-based billing",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "stripe-revenue-operations-finance-guide",
+     "topic": "Stripe Revenue Operations: What Finance Leaders Need to Know",
+     "keyword": "stripe revenue operations",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "ai-agents-financial-crime-detection",
+     "topic": "AI Agents for Financial Crime Detection: How Banks Are Fighting Fraud",
+     "keyword": "AI agents financial crime",
+     "category": "AI in Banking"},
+
+    {"slug": "agentic-commerce-finance-explained",
+     "topic": "What is Agentic Commerce? How AI Agents Are Changing Finance",
+     "keyword": "agentic commerce finance",
+     "category": "AI in Banking"},
+
     # ── Fintech Fundamentals ──────────────────────────────────────────────────
     {"slug": "what-is-embedded-finance",
      "topic": "What is Embedded Finance? A Complete Guide for CFOs",
