@@ -224,6 +224,292 @@ TOPICS = [
      "topic": "How Does Credit Scoring Work? FICO, CIBIL and Beyond",
      "keyword": "credit scoring how it works",
      "category": "Fintech Explainers"},
+
+    # ── SME & Startup Finance ─────────────────────────────────────────────────
+    {"slug": "how-to-raise-series-a",
+     "topic": "How to Raise a Series A: What VCs Actually Look For in 2026",
+     "keyword": "series A funding",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "startup-cash-flow-management",
+     "topic": "Startup Cash Flow Management: How to Extend Your Runway",
+     "keyword": "startup cash flow management",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "what-is-venture-capital",
+     "topic": "What is Venture Capital? How VC Funding Actually Works",
+     "keyword": "venture capital explained",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "startup-valuation-methods",
+     "topic": "How Startup Valuation Works: The 5 Methods VCs Use",
+     "keyword": "startup valuation methods",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "sme-financing-options",
+     "topic": "SME Financing Options: Loans, Equity, Grants and Alternatives",
+     "keyword": "SME financing options",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "what-is-equity-dilution",
+     "topic": "What is Equity Dilution? How Startup Founders Protect Ownership",
+     "keyword": "equity dilution startup",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "fintech-tools-for-startups",
+     "topic": "Best Fintech Tools for Startups in 2026: CFO Stack Guide",
+     "keyword": "fintech tools for startups",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "what-is-revenue-based-financing",
+     "topic": "What is Revenue-Based Financing? The Alternative to Giving Up Equity",
+     "keyword": "revenue based financing",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "cap-table-explained",
+     "topic": "Cap Table Explained: What Every Startup Founder Must Know",
+     "keyword": "cap table startup",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "startup-cfo-responsibilities",
+     "topic": "What Does a Startup CFO Actually Do? Roles and Key Metrics",
+     "keyword": "startup CFO responsibilities",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "how-to-read-term-sheet",
+     "topic": "How to Read a Term Sheet: Key Clauses Founders Must Negotiate",
+     "keyword": "term sheet startup funding",
+     "category": "SME & Startup Finance"},
+
+    {"slug": "sme-working-capital-management",
+     "topic": "Working Capital Management for SMEs: Practical CFO Guide",
+     "keyword": "working capital management SME",
+     "category": "SME & Startup Finance"},
+
+    # ── ESG & Climate Finance ─────────────────────────────────────────────────
+    {"slug": "what-is-csrd",
+     "topic": "What is CSRD? Europe's New Sustainability Reporting Law Explained",
+     "keyword": "CSRD sustainability reporting",
+     "category": "ESG & Climate Finance"},
+
+    {"slug": "what-are-green-bonds",
+     "topic": "What Are Green Bonds? How Climate Finance Actually Works",
+     "keyword": "green bonds climate finance",
+     "category": "ESG & Climate Finance"},
+
+    {"slug": "esg-investing-explained",
+     "topic": "ESG Investing Explained: Beyond the Buzzword for Finance Professionals",
+     "keyword": "ESG investing explained",
+     "category": "ESG & Climate Finance"},
+
+    {"slug": "what-is-carbon-credit-market",
+     "topic": "What is the Carbon Credit Market? How Companies Trade Emissions",
+     "keyword": "carbon credit market",
+     "category": "ESG & Climate Finance"},
+
+    {"slug": "esg-reporting-framework-comparison",
+     "topic": "GRI vs SASB vs TCFD: Which ESG Reporting Framework Should You Use?",
+     "keyword": "ESG reporting framework",
+     "category": "ESG & Climate Finance"},
+
+    {"slug": "what-is-net-zero-finance",
+     "topic": "What is Net Zero Finance? How Banks Are Funding the Climate Transition",
+     "keyword": "net zero finance",
+     "category": "ESG & Climate Finance"},
+
+    {"slug": "esg-fund-performance-analysis",
+     "topic": "Do ESG Funds Outperform? What the Data Actually Shows",
+     "keyword": "ESG fund performance",
+     "category": "ESG & Climate Finance"},
+
+    {"slug": "what-is-sustainable-finance-taxonomy",
+     "topic": "What is the EU Sustainable Finance Taxonomy? A CFO Explainer",
+     "keyword": "EU sustainable finance taxonomy",
+     "category": "ESG & Climate Finance"},
+
+    {"slug": "greenwashing-in-finance",
+     "topic": "What is Greenwashing in Finance? How Regulators Are Cracking Down",
+     "keyword": "greenwashing finance regulation",
+     "category": "ESG & Climate Finance"},
+
+    {"slug": "climate-risk-banking",
+     "topic": "How Banks Are Managing Climate Risk: Stress Tests and Scenarios",
+     "keyword": "climate risk banking",
+     "category": "ESG & Climate Finance"},
+
+    # ── PropTech & Real Estate Finance ────────────────────────────────────────
+    {"slug": "what-is-proptech",
+     "topic": "What is PropTech? How Technology is Transforming Real Estate Finance",
+     "keyword": "proptech real estate technology",
+     "category": "PropTech & Real Estate"},
+
+    {"slug": "how-reits-work",
+     "topic": "How REITs Work: A Finance Professional's Complete Guide",
+     "keyword": "REIT explained",
+     "category": "PropTech & Real Estate"},
+
+    {"slug": "tokenised-real-estate",
+     "topic": "Tokenised Real Estate: How Blockchain is Democratising Property Investment",
+     "keyword": "tokenised real estate investment",
+     "category": "PropTech & Real Estate"},
+
+    {"slug": "commercial-real-estate-finance",
+     "topic": "Commercial Real Estate Finance: Key Metrics Every CFO Must Know",
+     "keyword": "commercial real estate finance",
+     "category": "PropTech & Real Estate"},
+
+    {"slug": "ai-in-property-valuation",
+     "topic": "How AI is Changing Property Valuation and Mortgage Underwriting",
+     "keyword": "AI property valuation",
+     "category": "PropTech & Real Estate"},
+
+    {"slug": "fractional-property-investment",
+     "topic": "What is Fractional Property Investment? The New Way to Buy Real Estate",
+     "keyword": "fractional property investment",
+     "category": "PropTech & Real Estate"},
+
+    {"slug": "real-estate-debt-instruments",
+     "topic": "Real Estate Debt Instruments: Mortgages, CMBS and Private Credit",
+     "keyword": "real estate debt instruments",
+     "category": "PropTech & Real Estate"},
+
+    {"slug": "proptech-due-diligence",
+     "topic": "PropTech Due Diligence: How to Evaluate Real Estate Technology Vendors",
+     "keyword": "proptech vendor due diligence",
+     "category": "PropTech & Real Estate"},
+
+    # ── Wealth Management ─────────────────────────────────────────────────────
+    {"slug": "what-is-family-office",
+     "topic": "What is a Family Office? How Ultra-High-Net-Worth Families Manage Wealth",
+     "keyword": "family office wealth management",
+     "category": "Wealth Management"},
+
+    {"slug": "alternative-investments-explained",
+     "topic": "Alternative Investments Explained: Private Equity, Hedge Funds and More",
+     "keyword": "alternative investments explained",
+     "category": "Wealth Management"},
+
+    {"slug": "ai-in-wealth-management",
+     "topic": "How AI is Transforming Wealth Management and Private Banking",
+     "keyword": "AI wealth management",
+     "category": "Wealth Management"},
+
+    {"slug": "private-banking-vs-wealth-management",
+     "topic": "Private Banking vs Wealth Management: What's the Difference?",
+     "keyword": "private banking wealth management",
+     "category": "Wealth Management"},
+
+    {"slug": "how-hedge-funds-work",
+     "topic": "How Hedge Funds Work: Strategies, Fees and What HNIs Need to Know",
+     "keyword": "how hedge funds work",
+     "category": "Wealth Management"},
+
+    {"slug": "estate-planning-for-hni",
+     "topic": "Estate Planning for HNIs: Trusts, Wills and Tax Optimisation",
+     "keyword": "estate planning high net worth",
+     "category": "Wealth Management"},
+
+    {"slug": "multi-asset-portfolio-strategy",
+     "topic": "Multi-Asset Portfolio Strategy: How Institutional Investors Allocate",
+     "keyword": "multi asset portfolio strategy",
+     "category": "Wealth Management"},
+
+    {"slug": "what-is-discretionary-portfolio-management",
+     "topic": "What is Discretionary Portfolio Management? When to Hand Over Control",
+     "keyword": "discretionary portfolio management",
+     "category": "Wealth Management"},
+
+    {"slug": "offshore-wealth-management",
+     "topic": "Offshore Wealth Management: Compliance, Risk and Legitimate Uses",
+     "keyword": "offshore wealth management",
+     "category": "Wealth Management"},
+
+    {"slug": "impact-investing-explained",
+     "topic": "What is Impact Investing? Generating Returns While Doing Good",
+     "keyword": "impact investing",
+     "category": "Wealth Management"},
+
+    # ── Healthcare Finance ────────────────────────────────────────────────────
+    {"slug": "what-is-revenue-cycle-management",
+     "topic": "What is Revenue Cycle Management (RCM)? A Hospital CFO Guide",
+     "keyword": "revenue cycle management healthcare",
+     "category": "Healthcare Finance"},
+
+    {"slug": "ai-in-healthcare-finance",
+     "topic": "How AI is Cutting Costs in Hospital Finance and Medical Billing",
+     "keyword": "AI healthcare finance",
+     "category": "Healthcare Finance"},
+
+    {"slug": "medtech-funding-landscape",
+     "topic": "MedTech Funding in 2026: Where the Investment is Going",
+     "keyword": "medtech funding investment",
+     "category": "Healthcare Finance"},
+
+    {"slug": "hospital-cfo-challenges",
+     "topic": "Top 7 Financial Challenges Hospital CFOs Face in 2026",
+     "keyword": "hospital CFO financial challenges",
+     "category": "Healthcare Finance"},
+
+    {"slug": "value-based-care-finance",
+     "topic": "What is Value-Based Care? The Financial Model Replacing Fee-for-Service",
+     "keyword": "value based care finance",
+     "category": "Healthcare Finance"},
+
+    {"slug": "pharma-pricing-strategy",
+     "topic": "Pharma Pricing Strategy: How Drug Prices Are Set and Regulated",
+     "keyword": "pharmaceutical pricing strategy",
+     "category": "Healthcare Finance"},
+
+    {"slug": "health-insurance-finance-explained",
+     "topic": "How Health Insurance Finances Work: Premiums, Claims and Reserves",
+     "keyword": "health insurance finance",
+     "category": "Healthcare Finance"},
+
+    # ── Crypto & Web3 ─────────────────────────────────────────────────────────
+    {"slug": "institutional-bitcoin-strategy",
+     "topic": "Bitcoin as a Corporate Treasury Asset: What CFOs Need to Know",
+     "keyword": "bitcoin treasury strategy",
+     "category": "Crypto & Web3"},
+
+    {"slug": "what-is-mica-crypto-regulation",
+     "topic": "What is MiCA? Europe's Crypto Regulation and What it Means for Institutions",
+     "keyword": "MiCA crypto regulation",
+     "category": "Crypto & Web3"},
+
+    {"slug": "stablecoin-explained-institutional",
+     "topic": "Stablecoins Explained for Finance Professionals: USDC, USDT and CBDCs",
+     "keyword": "stablecoin institutional finance",
+     "category": "Crypto & Web3"},
+
+    {"slug": "crypto-custody-institutional",
+     "topic": "Crypto Custody for Institutions: How Banks Safeguard Digital Assets",
+     "keyword": "crypto custody institutional",
+     "category": "Crypto & Web3"},
+
+    {"slug": "defi-for-institutions",
+     "topic": "DeFi for Institutional Investors: Opportunities and Regulatory Risks",
+     "keyword": "DeFi institutional investors",
+     "category": "Crypto & Web3"},
+
+    {"slug": "crypto-accounting-tax",
+     "topic": "Crypto Accounting and Tax: What CFOs Must Know Before Filing",
+     "keyword": "crypto accounting tax CFO",
+     "category": "Crypto & Web3"},
+
+    {"slug": "tokenisation-of-traditional-assets",
+     "topic": "Tokenisation of Traditional Assets: Stocks, Bonds and Beyond",
+     "keyword": "tokenisation traditional assets",
+     "category": "Crypto & Web3"},
+
+    {"slug": "cbdc-impact-on-banking",
+     "topic": "CBDC Impact on Banking: What Central Bank Digital Currencies Mean for Banks",
+     "keyword": "CBDC impact banking",
+     "category": "Crypto & Web3"},
+
+    {"slug": "blockchain-trade-finance",
+     "topic": "How Blockchain is Transforming Trade Finance and Letters of Credit",
+     "keyword": "blockchain trade finance",
+     "category": "Crypto & Web3"},
 ]
 
 

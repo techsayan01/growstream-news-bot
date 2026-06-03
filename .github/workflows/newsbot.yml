@@ -2,17 +2,23 @@ name: GrowStream News Bot
 
 on:
   schedule:
-    # All times UTC. Adjust offsets to match your target timezone.
-    - cron: '0 3 * * *'      # 08:30 IST  — daily_news morning  (5 articles)
-    - cron: '30 8 * * *'     # 14:00 IST  — daily_news afternoon (5 articles)
-    - cron: '30 5 * * *'     # 11:00 IST  — hot_takes
+    # All times UTC (IST = UTC+5:30)
+    # ── Daily News: 3 runs × 5 articles = 15 articles/day ───────────────────
+    - cron: '0 3 * * *'      # 08:30 IST — daily_news morning
+    - cron: '0 7 * * *'      # 12:30 IST — daily_news midday
+    - cron: '30 11 * * *'    # 17:00 IST — daily_news evening
+    # ── Hot Takes: 2 per day ─────────────────────────────────────────────────
+    - cron: '30 5 * * *'     # 11:00 IST — hot_takes morning
+    - cron: '0 13 * * *'     # 18:30 IST — hot_takes evening
+    # ── Specialist pipelines ─────────────────────────────────────────────────
     - cron: '30 4 * * 1,3,5' # 10:00 IST Mon/Wed/Fri — follow_the_money
     - cron: '30 4 * * 2,4'   # 10:00 IST Tue/Thu     — translated
     - cron: '30 3 * * 0'     # 09:00 IST Sunday      — dumbest_move
     - cron: '0 4 1 * *'      # 09:30 IST 1st of month — leaderboards
-    - cron: '30 1 * * 2,5'  # 07:00 IST Tue/Fri      — evergreen
+    # ── Evergreen: daily Mon–Fri ─────────────────────────────────────────────
+    - cron: '30 1 * * 1,2,3,4,5'  # 07:00 IST Mon-Fri — evergreen
 
-  # Manual trigger — pick any pipeline from the dropdown
+  # Manual trigger
   workflow_dispatch:
     inputs:
       pipeline:
@@ -34,12 +40,12 @@ concurrency:
   # Each schedule slot gets its own group so they never block each other.
   # workflow_dispatch runs share one group (prevents accidental double-trigger).
   group: newsbot-${{ github.event.schedule || github.run_id }}
-  cancel-in-progress: false   # never cancel a running publish job
+  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -64,18 +70,18 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "pipeline=${{ inputs.pipeline }}" >> $GITHUB_OUTPUT
           else
-            # Use the exact cron expression that triggered this run.
-            # This is reliable regardless of how late GitHub fires the job.
             case "${{ github.event.schedule }}" in
-              "0 3 * * *")       echo "pipeline=daily_news"        >> $GITHUB_OUTPUT ;;
-              "30 8 * * *")      echo "pipeline=daily_news"        >> $GITHUB_OUTPUT ;;
-              "30 5 * * *")      echo "pipeline=hot_takes"         >> $GITHUB_OUTPUT ;;
-              "30 4 * * 1,3,5")  echo "pipeline=follow_the_money"  >> $GITHUB_OUTPUT ;;
-              "30 4 * * 2,4")    echo "pipeline=translated"        >> $GITHUB_OUTPUT ;;
-              "30 3 * * 0")      echo "pipeline=dumbest_move"      >> $GITHUB_OUTPUT ;;
-              "0 4 1 * *")       echo "pipeline=leaderboards"      >> $GITHUB_OUTPUT ;;
-              "30 1 * * 2,5")    echo "pipeline=evergreen"         >> $GITHUB_OUTPUT ;;
-              *)                 echo "pipeline=daily_news"        >> $GITHUB_OUTPUT ;;
+              "0 3 * * *")           echo "pipeline=daily_news"        >> $GITHUB_OUTPUT ;;
+              "0 7 * * *")           echo "pipeline=daily_news"        >> $GITHUB_OUTPUT ;;
+              "30 11 * * *")         echo "pipeline=daily_news"        >> $GITHUB_OUTPUT ;;
+              "30 5 * * *")          echo "pipeline=hot_takes"         >> $GITHUB_OUTPUT ;;
+              "0 13 * * *")          echo "pipeline=hot_takes"         >> $GITHUB_OUTPUT ;;
+              "30 4 * * 1,3,5")      echo "pipeline=follow_the_money"  >> $GITHUB_OUTPUT ;;
+              "30 4 * * 2,4")        echo "pipeline=translated"        >> $GITHUB_OUTPUT ;;
+              "30 3 * * 0")          echo "pipeline=dumbest_move"      >> $GITHUB_OUTPUT ;;
+              "0 4 1 * *")           echo "pipeline=leaderboards"      >> $GITHUB_OUTPUT ;;
+              "30 1 * * 1,2,3,4,5")  echo "pipeline=evergreen"         >> $GITHUB_OUTPUT ;;
+              *)                     echo "pipeline=daily_news"        >> $GITHUB_OUTPUT ;;
             esac
           fi
 
