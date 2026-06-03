@@ -76,11 +76,17 @@ def write_article(
     structure = template["structure"]
     extra_rules = template["writer_rules"]
 
-    _WRITER_MODELS = (
-        ["gemini-2.5-pro", "gemini-2.5-flash"]
-        if os.environ.get("NEWSBOT_WRITER") == "pro"
-        else ["gemini-2.5-flash"]
-    )
+    # Model selection via NEWSBOT_WRITER env var:
+    #   flash       → gemini-2.5-flash (default, cheapest)
+    #   pro         → gemini-2.5-pro   (better quality, ~33x cost)
+    #   3.1-pro     → gemini-3.1-pro-preview (best quality, ~50-80x cost)
+    #   3.5-flash   → gemini-3.5-flash (better than 2.5-flash, ~2-3x cost)
+    _WRITER_ENV = os.environ.get("NEWSBOT_WRITER", "flash")
+    _WRITER_MODELS = {
+        "pro":       ["gemini-2.5-pro",            "gemini-2.5-flash"],
+        "3.1-pro":   ["gemini-3.1-pro-preview",    "gemini-2.5-pro", "gemini-2.5-flash"],
+        "3.5-flash": ["gemini-3.5-flash",           "gemini-2.5-flash"],
+    }.get(_WRITER_ENV, ["gemini-2.5-flash"])
 
     if editor_notes and previous_article:
         log.info("  ✍️  Jordan Blake is revising based on editor feedback…")

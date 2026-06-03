@@ -83,6 +83,7 @@ jobs:
         run: python run.py --pipeline ${{ steps.pick.outputs.pipeline }}
         env:
           GEMINI_API_KEY:        ${{ secrets.GEMINI_API_KEY }}
+          NEWSBOT_WRITER:        ${{ secrets.NEWSBOT_WRITER }}
           MONGODB_URI:           ${{ secrets.MONGODB_URI }}
           MONGODB_DB_PASSWORD:   ${{ secrets.MONGODB_DB_PASSWORD }}
           WP_URL:                ${{ secrets.WP_URL }}
