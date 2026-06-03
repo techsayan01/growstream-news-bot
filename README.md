@@ -71,7 +71,7 @@ Create `.env` in the project root:
 
 ```env
 # Required — Anthropic (fact-check, rank, social copy, SEO metadata)
-CLAUDE_API_KEY=sk-ant-...
+# CLAUDE_API_KEY removed — migrated to Gemini
 
 # Required — Google Gemini (article writing + editorial review)
 # Get your API key from https://aistudio.google.com/app/apikey
@@ -320,7 +320,7 @@ schedule:
   - cron: '0 2 * * *'
 ```
 
-Required GitHub Secrets: `CLAUDE_API_KEY`, `GEMINI_API_KEY`, `WP_USERNAME`, `WP_PASSWORD`, `UNSPLASH_API_KEY`
+Required GitHub Secrets: `GEMINI_API_KEY`, `WP_USERNAME`, `WP_PASSWORD`, `UNSPLASH_API_KEY`
 
 ---
 
