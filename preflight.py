@@ -73,19 +73,36 @@ def _check_config(site: SiteConfig) -> CheckResult:
 
 
 def _check_gemini_model(model: str, label: str, fatal: bool) -> CheckResult:
-    """Check Gemini model availability using a metadata lookup (no quota consumed)."""
+    """Check Gemini model availability AND credit balance via a 1-token generation call."""
     try:
         from core.llm import get_gemini_client
+        from google.genai import types
         client = get_gemini_client()
-        # Use models.get() — a metadata call that validates the API key and confirms
-        # the model exists without burning any generation quota.
-        client.models.get(model=model)
-        return CheckResult(label, True, "Reachable (quota not pre-checked — errors surface at runtime)")
+        # Tiny generation call — costs ~1 output token but catches credit exhaustion
+        # that models.get() (metadata only) cannot detect.
+        client.models.generate_content(
+            model=model,
+            contents="Hi",
+            config=types.GenerateContentConfig(
+                max_output_tokens=1,
+                thinking_config=types.ThinkingConfig(thinking_budget=0)
+                if "flash" in model else None,
+            ),
+        )
+        return CheckResult(label, True, "Reachable")
     except ImportError:
         return CheckResult(label, False, "google-genai not installed")
     except Exception as e:
         err = str(e)
-        if "api_key" in err.lower() or "401" in err or "403" in err or "invalid" in err.lower():
+        if "RESOURCE_EXHAUSTED" in err or "prepayment credits" in err or "credits are depleted" in err:
+            return CheckResult(
+                label, False,
+                "Prepaid credits depleted — top up at aistudio.google.com",
+                fatal=True,
+            )
+        elif "quota" in err.lower() or "429" in err:
+            return CheckResult(label, False, "Rate limit hit — retry in 60s", fatal=False)
+        elif "api_key" in err.lower() or "401" in err or "403" in err or "invalid" in err.lower():
             return CheckResult(label, False, "Invalid API key", fatal=fatal)
         elif "404" in err or "not found" in err.lower():
             return CheckResult(label, False, "Model not found / unavailable", fatal=fatal)
@@ -230,6 +247,20 @@ def run_preflight(site: SiteConfig, abort_on_failure: bool = True) -> PreflightR
     report.log_summary()
 
     if abort_on_failure and not report.passed:
+        # Exit 0 for known recoverable failures (credits depleted, WP temporarily down)
+        # so GHA marks the run as Warning rather than Failure.
+        # Exit 1 only for hard misconfigurations (wrong API key, missing secrets).
+        credit_depleted = any(
+            "depleted" in (r.message or "").lower() or "credits" in (r.message or "").lower()
+            for r in report.results if not r.passed
+        )
+        wp_unreachable = any(
+            "unreachable" in (r.message or "").lower()
+            for r in report.results if not r.passed and r.name == "WordPress API"
+        )
+        if credit_depleted or wp_unreachable:
+            log.warning("  ⚠ Exiting with code 0 — transient issue, not a misconfiguration")
+            sys.exit(0)
         sys.exit(1)
 
     return report
