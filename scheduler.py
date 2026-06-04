@@ -1,11 +1,17 @@
 """
 GrowStream scheduler — runs as a persistent process (alternative to GHA).
 
+Schedule designed to hit 4 global finance audiences:
+  India morning   →  09:00 IST
+  London open     →  13:30 IST  (08:00 GMT)
+  US East morning →  18:30 IST  (08:00 EST)
+  US midday       →  20:30 IST  (10:00 EST / 07:00 PST)
+
 Daily output:
-  15 news articles  (3 × daily_news runs of 5 each)
-  2  hot takes      (morning + evening)
-  1  evergreen      (Mon–Fri)
-  Specialist pipelines on rotation
+  15 news articles  (3 × daily_news)
+   2 hot takes      (India midday + US midday)
+   1 evergreen      (Mon–Fri, early IST)
+   Specialist pipelines spread across London / US slots
 
 Usage:
     venv/bin/python3.13 scheduler.py
@@ -41,50 +47,60 @@ def _run(pipeline: str) -> None:
         print(f"[{now}] ERROR running {pipeline}: {e}", file=sys.stderr)
 
 
-# ── Daily News — 3 runs ───────────────────────────────────────────────────────
-schedule.every().day.at("08:30").do(_run, "daily_news")
-schedule.every().day.at("12:30").do(_run, "daily_news")
-schedule.every().day.at("17:00").do(_run, "daily_news")
-
-# ── Hot Takes — 2 per day ─────────────────────────────────────────────────────
-schedule.every().day.at("11:00").do(_run, "hot_takes")
-schedule.every().day.at("18:30").do(_run, "hot_takes")
-
-# ── Evergreen — Mon to Fri ────────────────────────────────────────────────────
+# ── Evergreen — Mon–Fri, early IST (indexes before peak traffic) ──────────────
 schedule.every().monday.at("07:00").do(_run, "evergreen")
 schedule.every().tuesday.at("07:00").do(_run, "evergreen")
 schedule.every().wednesday.at("07:00").do(_run, "evergreen")
 schedule.every().thursday.at("07:00").do(_run, "evergreen")
 schedule.every().friday.at("07:00").do(_run, "evergreen")
 
-# ── Specialist pipelines ──────────────────────────────────────────────────────
-schedule.every().monday.at("10:00").do(_run, "follow_the_money")
-schedule.every().wednesday.at("10:00").do(_run, "follow_the_money")
-schedule.every().friday.at("10:00").do(_run, "follow_the_money")
+# ── Daily News — India / London / US East ─────────────────────────────────────
+schedule.every().day.at("09:00").do(_run, "daily_news")   # India morning
+schedule.every().day.at("13:30").do(_run, "daily_news")   # London open (08:00 GMT)
+schedule.every().day.at("18:30").do(_run, "daily_news")   # US East morning (08:00 EST)
 
-schedule.every().tuesday.at("10:00").do(_run, "translated")
-schedule.every().thursday.at("10:00").do(_run, "translated")
+# ── Hot Takes — India midday + US midday ──────────────────────────────────────
+schedule.every().day.at("11:00").do(_run, "hot_takes")    # India midday
+schedule.every().day.at("20:30").do(_run, "hot_takes")    # US midday (10:00 EST / 07:00 PST)
 
-schedule.every().sunday.at("09:00").do(_run, "dumbest_move")
+# ── Follow the Money — Mon / Wed / Fri at London open ────────────────────────
+schedule.every().monday.at("14:30").do(_run, "follow_the_money")    # 09:00 GMT
+schedule.every().wednesday.at("14:30").do(_run, "follow_the_money") # 09:00 GMT
+schedule.every().friday.at("14:30").do(_run, "follow_the_money")    # 09:00 GMT
+
+# ── Translated — Tue / Thu at London open ────────────────────────────────────
+schedule.every().tuesday.at("15:00").do(_run, "translated")          # 09:30 GMT
+schedule.every().thursday.at("15:00").do(_run, "translated")         # 09:30 GMT
+
+# ── Dumbest Move — Sunday US midday ──────────────────────────────────────────
+schedule.every().sunday.at("22:30").do(_run, "dumbest_move")         # 12:00 EST / 09:00 PST
 
 
 def _maybe_leaderboards():
     if datetime.now().day == 1:
         _run("leaderboards")
 
-schedule.every().day.at("09:30").do(_maybe_leaderboards)
+schedule.every().day.at("09:30").do(_maybe_leaderboards)             # India morning, 1st of month
 
 
 if __name__ == "__main__":
     print("GrowStream scheduler started.")
-    print("\nDaily output target:")
-    print("  15 news articles  (08:30, 12:30, 17:00)")
-    print("   2 hot takes      (11:00, 18:30)")
-    print("   1 evergreen      (07:00 Mon-Fri)")
-    print("   + specialists on rotation")
-    print("\nJobs scheduled:")
-    for job in schedule.get_jobs():
-        print(f"  {job}")
+    print()
+    print("  Time (IST)   Pipeline              GMT        EST        PST")
+    print("  " + "─" * 65)
+    slots = [
+        ("07:00", "evergreen (Mon-Fri)", "01:30", "20:30(-1)", "17:30(-1)"),
+        ("09:00", "daily_news",          "03:30", "22:30(-1)", "19:30(-1)"),
+        ("11:00", "hot_takes",           "05:30", "00:30",     "21:30(-1)"),
+        ("13:30", "daily_news",          "08:00", "03:00",     "00:00"),
+        ("14:30", "follow_the_money",    "09:00", "04:00",     "01:00"),
+        ("15:00", "translated",          "09:30", "04:30",     "01:30"),
+        ("18:30", "daily_news",          "13:00", "08:00 ✓",   "05:00"),
+        ("20:30", "hot_takes",           "15:00", "10:00 ✓",   "07:00 ✓"),
+        ("22:30", "dumbest_move (Sun)",  "17:00", "12:00 ✓",   "09:00 ✓"),
+    ]
+    for ist, pipe, gmt, est, pst in slots:
+        print(f"  {ist:12} {pipe:22} {gmt:10} {est:10} {pst}")
     print()
     while True:
         schedule.run_pending()
