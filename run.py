@@ -55,7 +55,7 @@ _PIPELINE_NAMES = [
 def _run_pipeline(pipeline_name: str, site: SiteConfig, **kwargs) -> None:
     if pipeline_name == "daily_news":
         from pipelines.daily_news import run
-        run(site)
+        run(site, region=kwargs.get("region"))
     elif pipeline_name == "hot_takes":
         from pipelines.hot_takes import run
         run(site)
@@ -120,6 +120,16 @@ def main():
         ),
     )
     parser.add_argument(
+        "--region",
+        default=None,
+        choices=["india", "london", "us-east", "us-mid"],
+        help=(
+            "Restrict daily_news to categories relevant to this audience. "
+            "india=09:00 IST, london=13:30 IST, us-east=18:30 IST, us-mid=20:30 IST. "
+            "Omit to run all categories (manual/fallback)."
+        ),
+    )
+    parser.add_argument(
         "--skip-preflight",
         action="store_true",
         help="Skip pre-flight checks (useful for debugging)",
@@ -148,7 +158,7 @@ def main():
         run_preflight(site, abort_on_failure=True)
 
     # Run the pipeline
-    _run_pipeline(args.pipeline, site, url=args.url)
+    _run_pipeline(args.pipeline, site, url=args.url, region=args.region)
 
 
 if __name__ == "__main__":

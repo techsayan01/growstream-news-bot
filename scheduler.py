@@ -32,19 +32,20 @@ LOG_DIR  = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
 
-def _run(pipeline: str) -> None:
+def _run(pipeline: str, region: str | None = None) -> None:
     now     = datetime.now().strftime("%Y-%m-%d %H:%M")
     logfile = LOG_DIR / f"{pipeline}_{datetime.now().strftime('%Y%m%d')}.log"
-    print(f"[{now}] Starting: {pipeline}")
+    label   = f"{pipeline}[{region}]" if region else pipeline
+    print(f"[{now}] Starting: {label}")
     try:
+        cmd = [PYTHON, RUNNER, "--pipeline", pipeline]
+        if region:
+            cmd += ["--region", region]
         with open(logfile, "a") as f:
-            subprocess.run(
-                [PYTHON, RUNNER, "--pipeline", pipeline],
-                cwd=BASE_DIR, stdout=f, stderr=subprocess.STDOUT, check=False,
-            )
-        print(f"[{now}] Finished: {pipeline}")
+            subprocess.run(cmd, cwd=BASE_DIR, stdout=f, stderr=subprocess.STDOUT, check=False)
+        print(f"[{now}] Finished: {label}")
     except Exception as e:
-        print(f"[{now}] ERROR running {pipeline}: {e}", file=sys.stderr)
+        print(f"[{now}] ERROR running {label}: {e}", file=sys.stderr)
 
 
 # ── Evergreen — Mon–Fri, early IST (indexes before peak traffic) ──────────────
@@ -54,10 +55,10 @@ schedule.every().wednesday.at("07:00").do(_run, "evergreen")
 schedule.every().thursday.at("07:00").do(_run, "evergreen")
 schedule.every().friday.at("07:00").do(_run, "evergreen")
 
-# ── Daily News — India / London / US East ─────────────────────────────────────
-schedule.every().day.at("09:00").do(_run, "daily_news")   # India morning
-schedule.every().day.at("13:30").do(_run, "daily_news")   # London open (08:00 GMT)
-schedule.every().day.at("18:30").do(_run, "daily_news")   # US East morning (08:00 EST)
+# ── Daily News — region-targeted ─────────────────────────────────────────────
+schedule.every().day.at("09:00").do(_run, "daily_news", "india")    # India morning
+schedule.every().day.at("13:30").do(_run, "daily_news", "london")   # London open (08:00 GMT)
+schedule.every().day.at("18:30").do(_run, "daily_news", "us-east")  # US East morning (08:00 EST)
 
 # ── Hot Takes — India midday + US midday ──────────────────────────────────────
 schedule.every().day.at("11:00").do(_run, "hot_takes")    # India midday

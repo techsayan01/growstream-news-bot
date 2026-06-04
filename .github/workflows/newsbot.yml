@@ -78,29 +78,36 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Determine pipeline
+      - name: Determine pipeline and region
         id: pick
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "pipeline=${{ inputs.pipeline }}" >> $GITHUB_OUTPUT
+            echo "region="                          >> $GITHUB_OUTPUT
           else
             case "${{ github.event.schedule }}" in
-              "30 1 * * 1,2,3,4,5")  echo "pipeline=evergreen"         >> $GITHUB_OUTPUT ;;
-              "30 3 * * *")           echo "pipeline=daily_news"        >> $GITHUB_OUTPUT ;;
-              "0 8 * * *")            echo "pipeline=daily_news"        >> $GITHUB_OUTPUT ;;
-              "0 13 * * *")           echo "pipeline=daily_news"        >> $GITHUB_OUTPUT ;;
-              "30 5 * * *")           echo "pipeline=hot_takes"         >> $GITHUB_OUTPUT ;;
-              "0 15 * * *")           echo "pipeline=hot_takes"         >> $GITHUB_OUTPUT ;;
-              "0 9 * * 1,3,5")        echo "pipeline=follow_the_money"  >> $GITHUB_OUTPUT ;;
-              "30 9 * * 2,4")         echo "pipeline=translated"        >> $GITHUB_OUTPUT ;;
-              "0 17 * * 0")           echo "pipeline=dumbest_move"      >> $GITHUB_OUTPUT ;;
-              "0 4 1 * *")            echo "pipeline=leaderboards"      >> $GITHUB_OUTPUT ;;
-              *)                      echo "pipeline=daily_news"        >> $GITHUB_OUTPUT ;;
+              "30 1 * * 1,2,3,4,5")  echo "pipeline=evergreen"         >> $GITHUB_OUTPUT; echo "region="          >> $GITHUB_OUTPUT ;;
+              "30 3 * * *")           echo "pipeline=daily_news"        >> $GITHUB_OUTPUT; echo "region=india"     >> $GITHUB_OUTPUT ;;
+              "0 8 * * *")            echo "pipeline=daily_news"        >> $GITHUB_OUTPUT; echo "region=london"    >> $GITHUB_OUTPUT ;;
+              "0 13 * * *")           echo "pipeline=daily_news"        >> $GITHUB_OUTPUT; echo "region=us-east"   >> $GITHUB_OUTPUT ;;
+              "30 5 * * *")           echo "pipeline=hot_takes"         >> $GITHUB_OUTPUT; echo "region="          >> $GITHUB_OUTPUT ;;
+              "0 15 * * *")           echo "pipeline=hot_takes"         >> $GITHUB_OUTPUT; echo "region="          >> $GITHUB_OUTPUT ;;
+              "0 9 * * 1,3,5")        echo "pipeline=follow_the_money"  >> $GITHUB_OUTPUT; echo "region="          >> $GITHUB_OUTPUT ;;
+              "30 9 * * 2,4")         echo "pipeline=translated"        >> $GITHUB_OUTPUT; echo "region="          >> $GITHUB_OUTPUT ;;
+              "0 17 * * 0")           echo "pipeline=dumbest_move"      >> $GITHUB_OUTPUT; echo "region="          >> $GITHUB_OUTPUT ;;
+              "0 4 1 * *")            echo "pipeline=leaderboards"      >> $GITHUB_OUTPUT; echo "region="          >> $GITHUB_OUTPUT ;;
+              *)                      echo "pipeline=daily_news"        >> $GITHUB_OUTPUT; echo "region="          >> $GITHUB_OUTPUT ;;
             esac
           fi
 
       - name: Run ${{ steps.pick.outputs.pipeline }}
-        run: python run.py --pipeline ${{ steps.pick.outputs.pipeline }}
+        run: |
+          REGION="${{ steps.pick.outputs.region }}"
+          if [ -n "$REGION" ]; then
+            python run.py --pipeline ${{ steps.pick.outputs.pipeline }} --region "$REGION"
+          else
+            python run.py --pipeline ${{ steps.pick.outputs.pipeline }}
+          fi
         env:
           GEMINI_API_KEY:        ${{ secrets.GEMINI_API_KEY }}
           NEWSBOT_WRITER:        ${{ secrets.NEWSBOT_WRITER }}

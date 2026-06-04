@@ -305,7 +305,7 @@ class DailyNewsPipeline(Pipeline):
         log.warning(f"  ✗ Exhausted all {len(top_stories)} candidates for {cat_name}")
         return None
 
-    def run(self) -> None:
+    def run(self, region: str | None = None) -> None:
         log.info("=" * 60)
         log.info(f"  {self.site.display_name} — Multi-Agent News Bot v3")
         log.info(f"  {datetime.now().strftime('%Y-%m-%d %H:%M')}")
@@ -313,17 +313,32 @@ class DailyNewsPipeline(Pipeline):
         log.info("          Jordan Blake · Priya Sharma")
         log.info("=" * 60)
 
+        # Filter categories by region if specified
+        if region:
+            from sites.growstreammedia.feeds import REGIONAL_CATEGORIES
+            allowed_slugs = set(REGIONAL_CATEGORIES.get(region, []))
+            active_categories = [c for c in self.site.categories if c["slug"] in allowed_slugs]
+            if not active_categories:
+                log.warning(f"  ⚠ No categories matched region '{region}' — falling back to all")
+                active_categories = self.site.categories
+            else:
+                log.info(f"  🌍 Region: {region.upper()} — running {len(active_categories)} targeted categories:")
+                for c in active_categories:
+                    log.info(f"      • {c['name']}")
+        else:
+            active_categories = self.site.categories
+
         log.info("  🔍 Loading recently-used featured image slugs from WordPress…")
         used_image_slugs: set[str] = self.wp.get_recent_featured_image_slugs(days=7)
 
         results: list[dict] = []
         lock = threading.Lock()
 
-        # Run all categories in parallel (max 3 at a time to respect API rate limits)
+        # Run active categories in parallel (max 3 at a time to respect API rate limits)
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {
                 executor.submit(self._process_category, cat, used_image_slugs): cat
-                for cat in self.site.categories
+                for cat in active_categories
             }
             for future in as_completed(futures):
                 cat = futures[future]
@@ -336,11 +351,11 @@ class DailyNewsPipeline(Pipeline):
                     log.error(f"  ✗ Unexpected error in {cat['name']}: {e}", exc_info=True)
 
         published = len(results)
-        skipped   = len(self.site.categories) - published
+        skipped   = len(active_categories) - published
 
         # Summary
         log.info(f"\n{'=' * 60}")
-        log.info(f"  COMPLETED — {published}/{len(self.site.categories)} published | {skipped} skipped")
+        log.info(f"  COMPLETED — {published}/{len(active_categories)} published | {skipped} skipped")
         log.info(f"{'=' * 60}")
         for r in results:
             log.info(
@@ -356,6 +371,13 @@ class DailyNewsPipeline(Pipeline):
             raise SystemExit("No articles published — check logs for details")
 
 
-def run(site: SiteConfig) -> None:
-    """Convenience entry-point for the daily news pipeline."""
-    DailyNewsPipeline(site).run()
+def run(site: SiteConfig, region: str | None = None) -> None:
+    """Convenience entry-point for the daily news pipeline.
+
+    Args:
+        site:   Site configuration.
+        region: Optional audience region — 'india', 'london', 'us-east', 'us-mid'.
+                Filters categories to those relevant to that audience.
+                If None, all categories run (used for manual/fallback runs).
+    """
+    DailyNewsPipeline(site).run(region=region)

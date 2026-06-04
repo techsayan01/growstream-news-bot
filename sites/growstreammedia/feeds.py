@@ -187,6 +187,47 @@ CATEGORY_FEEDS: dict[str, list[str]] = {
     ],
 }
 
+# ── Regional category sets — which categories run at each publish slot ────────
+#
+# Each region maps to the categories most relevant to that audience.
+# The daily_news pipeline uses this when --region is passed.
+#
+#   india   → 09:00 IST — RBI/SEBI, Indian fintech, Asian markets
+#   london  → 13:30 IST — FCA, ECB, DORA, MiCA, ESG (EU taxonomy)
+#   us-east → 18:30 IST — SEC, Fed, US VC, Wall Street, US crypto
+#   us-mid  → 20:30 IST — Healthcare, Wealth management, PropTech, broad
+
+REGIONAL_CATEGORIES: dict[str, list[str]] = {
+    "india": [
+        "fintech-news",         # Indian startup funding rounds, neobanks
+        "ai-in-banking",        # RBI AI guidelines, Indian bank tech
+        "regulatory-updates",   # RBI, SEBI, IRDAI circulars
+        "sme-startup-finance",  # Indian startup ecosystem
+        "investment-ai",        # Asian market movers, BSE/NSE signals
+    ],
+    "london": [
+        "regulatory-updates",   # FCA, ECB, PRA, DORA, EU AI Act
+        "esg-climate-finance",  # EU taxonomy, CSRD, green bonds
+        "crypto-web3",          # MiCA enforcement, EU crypto regulation
+        "wealth-management",    # London private banking, family offices
+        "fintech-news",         # UK/EU fintech (Revolut, Wise, Monzo)
+    ],
+    "us-east": [
+        "investment-ai",        # SEC filings, Fed moves, Wall Street
+        "fintech-news",         # US VC rounds, Stripe, Plaid, Brex
+        "sme-startup-finance",  # Silicon Valley funding, Y Combinator
+        "regulatory-updates",   # SEC, CFPB, OCC actions
+        "crypto-web3",          # SEC crypto enforcement, BTC ETF
+    ],
+    "us-mid": [
+        "healthcare-finance",   # US hospital CFOs, MedTech, pharma
+        "wealth-management",    # HNI, family offices, private equity
+        "proptech-real-estate", # US CRE, REIT earnings, mortgage rates
+        "ai-in-banking",        # US bank AI deployments, JPM/GS tech
+        "tool-reviews",         # US fintech SaaS, product launches
+    ],
+}
+
 FALLBACK_FEEDS: list[str] = [
     _FINEXTRA_ALL,
     _TECHCRUNCH,
