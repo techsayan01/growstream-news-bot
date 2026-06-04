@@ -252,11 +252,11 @@ def run_preflight(site: SiteConfig, abort_on_failure: bool = True) -> PreflightR
         # Exit 1 only for hard misconfigurations (wrong API key, missing secrets).
         credit_depleted = any(
             "depleted" in (r.message or "").lower() or "credits" in (r.message or "").lower()
-            for r in report.results if not r.passed
+            for r in report.results if not r.ok
         )
         wp_unreachable = any(
             "unreachable" in (r.message or "").lower()
-            for r in report.results if not r.passed and r.name == "WordPress API"
+            for r in report.results if not r.ok and r.name == "WordPress API"
         )
         if credit_depleted or wp_unreachable:
             log.warning("  ⚠ Exiting with code 0 — transient issue, not a misconfiguration")
