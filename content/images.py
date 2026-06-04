@@ -1,7 +1,13 @@
 """
-Unsplash image fetching with 7-day deduplication.
+Multi-source image fetching with 7-day deduplication.
 
-UNSPLASH_API_KEY is read from the environment (global across all sites).
+Tries sources in order: Unsplash → Pexels → Pixabay (all free/unlimited).
+API keys read from environment:
+  - UNSPLASH_API_KEY    (optional, recommended)
+  - PEXELS_API_KEY      (optional, recommended as primary)
+  - PIXABAY_API_KEY     (optional, recommended as fallback)
+
+At least one API key should be configured for image fetching to work.
 """
 
 import os
@@ -27,6 +33,8 @@ except ImportError:
     pass
 
 UNSPLASH_API_KEY = os.environ.get("UNSPLASH_API_KEY", "")
+PEXELS_API_KEY   = os.environ.get("PEXELS_API_KEY", "")
+PIXABAY_API_KEY  = os.environ.get("PIXABAY_API_KEY", "")
 
 _FALLBACK_QUERIES = ["finance technology", "business data", "digital economy"]
 
@@ -41,7 +49,7 @@ def fetch_unsplash_images(
     count: int = 3,
     used_slugs: set[str] | None = None,
 ) -> list[dict]:
-    """Return up to *count* deduplicated Unsplash image dicts."""
+    """Return up to *count* deduplicated images from Unsplash → Pexels → Pixabay."""
     used_slugs   = used_slugs or set()
     style_words  = category_style.split()
     primary_queries = [
@@ -53,10 +61,27 @@ def fetch_unsplash_images(
     images: list[dict] = []
     for i in range(count):
         query = primary_queries[i] if i < len(primary_queries) else _FALLBACK_QUERIES[i]
-        img   = _fetch_single_image(query, i, used_slugs)
+
+        # Try sources in order: Unsplash → Pexels → Pixabay
+        img = None
+        if UNSPLASH_API_KEY:
+            img = _fetch_from_unsplash(query, i, used_slugs)
+        if not img and PEXELS_API_KEY:
+            img = _fetch_from_pexels(query, i, used_slugs)
+        if not img and PIXABAY_API_KEY:
+            img = _fetch_from_pixabay(query, i, used_slugs)
+
+        # Fallback queries
         if not img:
             log.warning("  ⚠ Trying fallback image query")
-            img = _fetch_single_image(_FALLBACK_QUERIES[i % len(_FALLBACK_QUERIES)], i, used_slugs)
+            fallback_query = _FALLBACK_QUERIES[i % len(_FALLBACK_QUERIES)]
+            if UNSPLASH_API_KEY:
+                img = _fetch_from_unsplash(fallback_query, i, used_slugs)
+            if not img and PEXELS_API_KEY:
+                img = _fetch_from_pexels(fallback_query, i, used_slugs)
+            if not img and PIXABAY_API_KEY:
+                img = _fetch_from_pixabay(fallback_query, i, used_slugs)
+
         if img:
             images.append(img)
 
@@ -64,7 +89,9 @@ def fetch_unsplash_images(
     return images
 
 
-def _fetch_single_image(query: str, index: int, used_slugs: set[str]) -> dict | None:
+# ── Unsplash (highest quality, 50 req/hr free) ────────────────────────────────
+
+def _fetch_from_unsplash(query: str, index: int, used_slugs: set[str]) -> dict | None:
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             r = requests.get(
@@ -90,7 +117,7 @@ def _fetch_single_image(query: str, index: int, used_slugs: set[str]) -> dict | 
                     break
 
             if chosen is None:
-                log.warning(f"  ⚠ All candidates for '{query}' recently used — using fallback")
+                log.warning(f"  ⚠ Unsplash: All candidates for '{query}' recently used — using fallback")
                 chosen = fallback
             if chosen is None:
                 return None
@@ -114,11 +141,12 @@ def _fetch_single_image(query: str, index: int, used_slugs: set[str]) -> dict | 
                 "photographer_url": chosen["user"]["links"]["html"],
                 "unsplash_id":      _slug_from_url(chosen["urls"]["regular"]),
                 "is_hero":          index == 0,
+                "source":           "unsplash",
             }
 
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 403:
-                log.error("  ✗ Unsplash API key invalid or rate limited")
+                log.warning("  ⚠ Unsplash API rate limited, trying next source")
                 return None
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY)
@@ -126,5 +154,128 @@ def _fetch_single_image(query: str, index: int, used_slugs: set[str]) -> dict | 
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY)
             else:
-                log.error(f"  ✗ Image fetch failed: {e}")
+                log.debug(f"  ⚠ Unsplash fetch failed: {e}")
+    return None
+
+
+# ── Pexels (unlimited free, great quality) ────────────────────────────────────
+
+def _fetch_from_pexels(query: str, index: int, used_slugs: set[str]) -> dict | None:
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            r = requests.get(
+                "https://api.pexels.com/v1/search",
+                params={"query": query, "per_page": 15, "orientation": "landscape"},
+                headers={"Authorization": PEXELS_API_KEY},
+                timeout=REQUEST_TIMEOUT,
+            )
+            r.raise_for_status()
+            results = r.json().get("photos", [])
+            if not results:
+                return None
+
+            random.shuffle(results)
+            chosen   = None
+            fallback = None
+            for photo in results:
+                slug = str(photo["id"])
+                if fallback is None:
+                    fallback = photo
+                if slug not in used_slugs and not is_image_used(slug):
+                    chosen = photo
+                    break
+
+            if chosen is None:
+                log.warning(f"  ⚠ Pexels: All candidates for '{query}' recently used — using fallback")
+                chosen = fallback
+            if chosen is None:
+                return None
+
+            used_slugs.add(str(chosen["id"]))
+
+            return {
+                "url":              chosen["src"]["landscape"],  # 940x627
+                "alt":              chosen.get("alt") or query,
+                "photographer":     chosen["photographer"],
+                "photographer_url": chosen["photographer_url"],
+                "pexels_id":        str(chosen["id"]),
+                "is_hero":          index == 0,
+                "source":           "pexels",
+            }
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 403:
+                log.warning("  ⚠ Pexels API key invalid, trying next source")
+                return None
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_DELAY)
+        except Exception as e:
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_DELAY)
+            else:
+                log.debug(f"  ⚠ Pexels fetch failed: {e}")
+    return None
+
+
+# ── Pixabay (unlimited free, largest library) ──────────────────────────────────
+
+def _fetch_from_pixabay(query: str, index: int, used_slugs: set[str]) -> dict | None:
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            r = requests.get(
+                "https://pixabay.com/api/",
+                params={
+                    "key": PIXABAY_API_KEY,
+                    "q": query,
+                    "per_page": 15,
+                    "image_type": "photo",
+                    "order": "popular",
+                },
+                timeout=REQUEST_TIMEOUT,
+            )
+            r.raise_for_status()
+            results = r.json().get("hits", [])
+            if not results:
+                return None
+
+            random.shuffle(results)
+            chosen   = None
+            fallback = None
+            for photo in results:
+                slug = str(photo["id"])
+                if fallback is None:
+                    fallback = photo
+                if slug not in used_slugs and not is_image_used(slug):
+                    chosen = photo
+                    break
+
+            if chosen is None:
+                log.warning(f"  ⚠ Pixabay: All candidates for '{query}' recently used — using fallback")
+                chosen = fallback
+            if chosen is None:
+                return None
+
+            used_slugs.add(str(chosen["id"]))
+
+            return {
+                "url":              chosen["largeImageURL"],
+                "alt":              chosen.get("tags", "").split(",")[0] if chosen.get("tags") else query,
+                "photographer":     chosen["user"],
+                "photographer_url": f"https://pixabay.com/users/{chosen['user']}-{chosen['user_id']}/",
+                "pixabay_id":       str(chosen["id"]),
+                "is_hero":          index == 0,
+                "source":           "pixabay",
+            }
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 403:
+                log.warning("  ⚠ Pixabay API key invalid")
+                return None
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_DELAY)
+        except Exception as e:
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_DELAY)
+            else:
+                log.debug(f"  ⚠ Pixabay fetch failed: {e}")
     return None

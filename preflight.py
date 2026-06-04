@@ -23,6 +23,8 @@ from core.utils import log
 from sites.base import SiteConfig
 
 UNSPLASH_API_KEY = os.environ.get("UNSPLASH_API_KEY", "")
+PEXELS_API_KEY   = os.environ.get("PEXELS_API_KEY", "")
+PIXABAY_API_KEY  = os.environ.get("PIXABAY_API_KEY", "")
 
 
 @dataclass
@@ -137,23 +139,82 @@ def _check_gemini_quota() -> list[CheckResult]:
 
 
 
-def _check_unsplash() -> CheckResult:
-    try:
-        r = requests.get(
-            "https://api.unsplash.com/search/photos",
-            params={"query": "test", "per_page": 1},
-            headers={"Authorization": f"Client-ID {UNSPLASH_API_KEY}"},
-            timeout=REQUEST_TIMEOUT,
-        )
-        if r.status_code == 200:
-            remaining = r.headers.get("X-Ratelimit-Remaining", "?")
-            return CheckResult("Unsplash API", True, f"Reachable — {remaining} requests remaining", fatal=False)
-        elif r.status_code == 401:
-            return CheckResult("Unsplash API", False, "Invalid API key (401)", fatal=False)
-        else:
-            return CheckResult("Unsplash API", False, f"Status {r.status_code}", fatal=False)
-    except Exception as e:
-        return CheckResult("Unsplash API", False, f"Unreachable: {str(e)[:60]}", fatal=False)
+def _check_image_apis() -> CheckResult:
+    """Check at least one image API (Unsplash, Pexels, or Pixabay) is available.
+
+    Uses a fallback chain: tries each in order, reports which are working.
+    Fatal only if ALL are misconfigured or unreachable.
+    """
+    available = []
+    errors = []
+
+    # Check Unsplash
+    if UNSPLASH_API_KEY:
+        try:
+            r = requests.get(
+                "https://api.unsplash.com/search/photos",
+                params={"query": "test", "per_page": 1},
+                headers={"Authorization": f"Client-ID {UNSPLASH_API_KEY}"},
+                timeout=REQUEST_TIMEOUT,
+            )
+            if r.status_code == 200:
+                remaining = r.headers.get("X-Ratelimit-Remaining", "?")
+                available.append(f"Unsplash ({remaining} req/hr remaining)")
+            elif r.status_code == 401:
+                errors.append("Unsplash: Invalid key (401)")
+            else:
+                errors.append(f"Unsplash: Status {r.status_code}")
+        except Exception as e:
+            errors.append(f"Unsplash: {str(e)[:40]}")
+    else:
+        errors.append("Unsplash: No API key configured")
+
+    # Check Pexels
+    if PEXELS_API_KEY:
+        try:
+            r = requests.get(
+                "https://api.pexels.com/v1/search",
+                params={"query": "test", "per_page": 1},
+                headers={"Authorization": PEXELS_API_KEY},
+                timeout=REQUEST_TIMEOUT,
+            )
+            if r.status_code == 200:
+                available.append("Pexels (unlimited free)")
+            elif r.status_code == 401:
+                errors.append("Pexels: Invalid key (401)")
+            else:
+                errors.append(f"Pexels: Status {r.status_code}")
+        except Exception as e:
+            errors.append(f"Pexels: {str(e)[:40]}")
+    else:
+        errors.append("Pexels: No API key configured")
+
+    # Check Pixabay
+    if PIXABAY_API_KEY:
+        try:
+            r = requests.get(
+                "https://pixabay.com/api/",
+                params={"key": PIXABAY_API_KEY, "q": "test", "per_page": 1},
+                timeout=REQUEST_TIMEOUT,
+            )
+            if r.status_code == 200:
+                available.append("Pixabay (unlimited free)")
+            elif r.status_code == 401:
+                errors.append("Pixabay: Invalid key (401)")
+            else:
+                errors.append(f"Pixabay: Status {r.status_code}")
+        except Exception as e:
+            errors.append(f"Pixabay: {str(e)[:40]}")
+    else:
+        errors.append("Pixabay: No API key configured")
+
+    # Report status
+    if available:
+        message = f"Available: {', '.join(available)}"
+        return CheckResult("Image APIs", True, message, fatal=False)
+    else:
+        message = "No image API configured or reachable. Configure at least one: UNSPLASH_API_KEY, PEXELS_API_KEY, or PIXABAY_API_KEY"
+        return CheckResult("Image APIs", False, message, fatal=True)
 
 
 def _check_wordpress(site: SiteConfig) -> CheckResult:
@@ -241,7 +302,7 @@ def run_preflight(site: SiteConfig, abort_on_failure: bool = True) -> PreflightR
     if report.passed:
         for result in _check_gemini_quota():
             report.add(result)
-        report.add(_check_unsplash())
+        report.add(_check_image_apis())
         report.add(_check_wordpress(site))
 
     report.log_summary()
