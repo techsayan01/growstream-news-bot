@@ -133,6 +133,13 @@ CATEGORY_FEEDS: dict[str, list[str]] = {
         _PYMNTS,
     ],
 
+    "fintech-explainers": [
+        _FINEXTRA_ALL,
+        _TECHCRUNCH_FINTECH,
+        _PYMNTS,
+        _AI_NEWS,
+    ],
+
     # ── New segments ──────────────────────────────────────────────────────────
 
     "sme-startup-finance": [
@@ -284,6 +291,15 @@ CATEGORIES: list[dict] = [
         "image_style":             "software technology product interface dashboard",
         "author_id":               3,
         "preferred_article_types": ["product_launch", "explainer"],
+    },
+
+    {
+        "slug":                    "fintech-explainers",
+        "name":                    "Fintech Explainers",
+        "keywords":                ["explained", "what is", "how does", "guide", "fintech", "banking", "payments"],
+        "image_style":             "fintech education explainer concept technology",
+        "author_id":               4,
+        "preferred_article_types": ["explainer"],
     },
 
     # ── New segments ──────────────────────────────────────────────────────────
