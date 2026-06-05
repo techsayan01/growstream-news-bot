@@ -97,21 +97,19 @@ def _check_gemini_model(model: str, label: str, fatal: bool) -> CheckResult:
     except Exception as e:
         err = str(e)
         if "RESOURCE_EXHAUSTED" in err or "prepayment credits" in err or "credits are depleted" in err:
+            # Hard stop — no credits means zero articles can publish
             return CheckResult(
                 label, False,
                 "Prepaid credits depleted — top up at aistudio.google.com",
                 fatal=True,
             )
-        elif "quota" in err.lower() or "429" in err:
-            return CheckResult(label, False, "Rate limit hit — retry in 60s", fatal=False)
-        elif "api_key" in err.lower() or "401" in err or "403" in err or "invalid" in err.lower():
-            return CheckResult(label, False, "Invalid API key", fatal=fatal)
-        elif "404" in err or "not found" in err.lower():
-            return CheckResult(label, False, "Model not found / unavailable", fatal=fatal)
-        elif "timeout" in err.lower() or "connection" in err.lower():
-            return CheckResult(label, False, "Network timeout", fatal=False)
+        elif "api_key" in err.lower() or "INVALID_ARGUMENT" in err or "401" in err or "403" in err:
+            # Bad key is always fatal — nothing will work
+            return CheckResult(label, False, f"Invalid API key: {err[:60]}", fatal=True)
         else:
-            return CheckResult(label, False, err[:80], fatal=fatal)
+            # Everything else (429, 500, timeout, connection, model unavailable) is
+            # transient — don't abort the run, let the pipeline retry naturally
+            return CheckResult(label, False, f"Transient error (will retry): {err[:60]}", fatal=False)
 
 
 def _check_gemini_quota() -> list[CheckResult]:
