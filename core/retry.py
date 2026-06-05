@@ -7,7 +7,7 @@ from .utils import log
 
 MAX_RETRIES = 3
 RETRY_DELAY = 5
-REQUEST_TIMEOUT = 15
+REQUEST_TIMEOUT = 30
 
 
 def with_retry(max_retries: int = MAX_RETRIES, delay: int = RETRY_DELAY, fallback=None):

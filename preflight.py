@@ -213,8 +213,8 @@ def _check_image_apis() -> CheckResult:
         message = f"Available: {', '.join(available)}"
         return CheckResult("Image APIs", True, message, fatal=False)
     else:
-        message = "No image API configured or reachable. Configure at least one: UNSPLASH_API_KEY, PEXELS_API_KEY, or PIXABAY_API_KEY"
-        return CheckResult("Image APIs", False, message, fatal=True)
+        message = "No image API reachable — articles will publish without featured images. Add PEXELS_API_KEY or UNSPLASH_API_KEY to fix."
+        return CheckResult("Image APIs", False, message, fatal=False)  # non-fatal: pipeline still runs
 
 
 def _check_wordpress(site: SiteConfig) -> CheckResult:
