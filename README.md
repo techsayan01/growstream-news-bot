@@ -311,16 +311,64 @@ Each site gets its own SQLite database at `data/<sitename>.db`:
 
 ---
 
-## GitHub Actions
+## GitHub Actions — Publish Schedule
 
-Daily schedule via `.github/workflows/news_bot_production.yml` (2:00 AM UTC = 7:30 AM IST):
+All times shown in IST (UTC+5:30). Schedule is spread across India, London, and US audiences.
 
-```yaml
-schedule:
-  - cron: '0 2 * * *'
+| Time (IST) | UTC | Pipeline | Region / Audience | Days |
+|---|---|---|---|---|
+| 07:00 | 01:30 | `evergreen` | — | Mon–Fri |
+| 09:00 | 03:30 | `daily_news` | 🇮🇳 India morning | Daily |
+| 11:00 | 05:30 | `hot_takes` | 🇮🇳 India midday | Daily |
+| 13:30 | 08:00 | `daily_news` | 🇬🇧 London open | Daily |
+| 14:30 | 09:00 | `follow_the_money` | 🇬🇧 London open | Mon / Wed / Fri |
+| 15:00 | 09:30 | `translated` | 🇬🇧 London open | Tue / Thu |
+| 18:30 | 13:00 | `daily_news` | 🇺🇸 US East morning | Daily |
+| 20:30 | 15:00 | `hot_takes` | 🇺🇸 US midday | Daily |
+| 22:30 | 17:00 | `dumbest_move` | 🇺🇸 US midday | Sunday only |
+| 09:30 | 04:00 | `leaderboards` | — | 1st of month |
+
+**Daily output target:** ~18–20 articles/day on weekdays, ~15 on weekends.
+
+### Regional category targeting
+
+Each `daily_news` run publishes content relevant to its audience:
+
+| Slot | Categories |
+|---|---|
+| 🇮🇳 India (09:00) | Fintech News, AI in Banking, Regulatory (RBI/SEBI), SME Finance, Investment AI |
+| 🇬🇧 London (13:30) | Regulatory (FCA/ECB/DORA), ESG & Climate, Crypto (MiCA), Wealth Management |
+| 🇺🇸 US East (18:30) | Investment AI (SEC/Fed), Fintech (US VC), SME Finance, Regulatory (CFPB), Crypto |
+| 🇺🇸 US Mid (20:30) | Healthcare Finance, Wealth Management, PropTech, AI in Banking, Tool Reviews |
+
+### GitHub Secrets required
+
+| Secret | Purpose |
+|---|---|
+| `GEMINI_API_KEY` | LLM writer + editor |
+| `NEWSBOT_WRITER` | Model override (`flash` / `pro`) |
+| `MONGODB_URI` | MongoDB Atlas connection |
+| `MONGODB_DB_PASSWORD` | DB auth |
+| `WP_URL` | WordPress site URL |
+| `WP_USERNAME` | WordPress username |
+| `WP_PASSWORD` | WordPress app password |
+| `WP_API_KEY` | WordPress API key |
+| `UNSPLASH_API_KEY` | Primary image source (50/hr free) |
+| `PEXELS_API_KEY` | Secondary image source (unlimited free) |
+| `LINKEDIN_ACCESS_TOKEN` | LinkedIn posting |
+| `LINKEDIN_REFRESH_TOKEN` | LinkedIn auto-refresh |
+| `LINKEDIN_CLIENT_ID` | LinkedIn app |
+| `LINKEDIN_CLIENT_SECRET` | LinkedIn app |
+| `LINKEDIN_ORG_URN` | LinkedIn company page |
+| `LINKEDIN_PERSON_URN` | LinkedIn personal profile (fallback) |
+
+### If scheduled runs stop firing
+
+GitHub Actions sometimes skips 1–2 runs after a workflow file is edited. To manually trigger:
+
 ```
-
-Required GitHub Secrets: `GEMINI_API_KEY`, `WP_USERNAME`, `WP_PASSWORD`, `UNSPLASH_API_KEY`
+repo → Actions → GrowStream News Bot → Run workflow → select pipeline → Run workflow
+```
 
 ---
 
