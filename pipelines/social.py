@@ -101,16 +101,20 @@ class SocialPipeline(Pipeline):
             if res == "already_posted": return "⏭ skipped (already posted)"
             return "✅ published" if res else "✗ failed / skipped"
 
-        li_url = self.linkedin.post(copy, post, db_row) if self.linkedin else None
-        tw_ids = self.twitter.post(copy, post, db_row) if self.twitter else None
-        fb_id  = self.facebook.post(copy, post, db_row) if self.facebook else None
+        def _safe_post(name, poster, *args):
+            """Post to a platform, returning None on any exception so other platforms still run."""
+            if poster is None:
+                log.info(f"  ⏭ {name}: not configured")
+                return None
+            try:
+                return poster.post(*args)
+            except Exception as e:
+                log.error(f"  ✗ {name}: unexpected error (WordPress unaffected) — {e}")
+                return None
 
-        if not self.linkedin:
-            log.info("  ⏭ LinkedIn: not configured")
-        if not self.twitter:
-            log.info("  ⏭ X: not configured")
-        if not self.facebook:
-            log.info("  ⏭ Facebook: not configured")
+        li_url = _safe_post("LinkedIn", self.linkedin, copy, post, db_row)
+        tw_ids = _safe_post("X",        self.twitter,  copy, post, db_row)
+        fb_id  = _safe_post("Facebook", self.facebook, copy, post, db_row)
 
         log.info("\n  📊 Social publish summary:")
         log.info(f"     LinkedIn : {fmt(li_url)}")
