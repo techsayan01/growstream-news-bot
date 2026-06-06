@@ -98,10 +98,11 @@ def _db():
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 def configure(db_name: str) -> None:
-    """Set the target database and ensure indexes exist."""
+    """Set the target database, ensure indexes, and purge stale data."""
     global _db_name
     _db_name = db_name
     _ensure_indexes()
+    _purge_old_records()
     log.info(f"  ✓ MongoDB configured: {db_name}")
 
 
@@ -119,6 +120,52 @@ def _ensure_indexes() -> None:
 
     db.social_queue.create_index("added_at")
     db.llm_metrics.create_index([("run_date", DESCENDING)])
+
+
+# ── Auto-purge ────────────────────────────────────────────────────────────────
+
+def _purge_old_records() -> None:
+    """Delete stale records to keep MongoDB Atlas storage lean.
+
+    Retention policy:
+      raw_stories    30 days  — dedup cache only, no long-term value
+      llm_metrics    90 days  — keep 3 months for cost trend analysis
+      social_queue   60 days  — keep posted records for audit trail
+
+    Never purged (must keep forever):
+      published_articles — used for internal linking + headline dedup
+      evergreen_topics   — queue state, must persist
+    """
+    db     = _db()
+    now    = datetime.now(timezone.utc)
+    purged = {}
+
+    # raw_stories — created_at field
+    cutoff_30 = now - timedelta(days=30)
+    r = db.raw_stories.delete_many({"created_at": {"$lt": cutoff_30}})
+    if r.deleted_count:
+        purged["raw_stories"] = r.deleted_count
+
+    # llm_metrics — run_date field
+    cutoff_90 = now - timedelta(days=90)
+    r = db.llm_metrics.delete_many({"run_date": {"$lt": cutoff_90}})
+    if r.deleted_count:
+        purged["llm_metrics"] = r.deleted_count
+
+    # social_queue — added_at field, only purge already-posted rows
+    cutoff_60 = now - timedelta(days=60)
+    r = db.social_queue.delete_many({
+        "added_at": {"$lt": cutoff_60},
+        "linkedin_status": {"$in": ["published", "failed"]},
+        "twitter_status":  {"$in": ["published", "failed", "pending"]},
+        "facebook_status": {"$in": ["published", "failed", "pending"]},
+    })
+    if r.deleted_count:
+        purged["social_queue"] = r.deleted_count
+
+    if purged:
+        summary = ", ".join(f"{col} -{n}" for col, n in purged.items())
+        log.info(f"  🧹 Auto-purge: {summary}")
 
 
 # ── Story DAOs ────────────────────────────────────────────────────────────────
