@@ -203,6 +203,7 @@ class EvergreenPipeline(Pipeline):
             content, images, story, focus_keyword, meta_description,
             publisher_name=self.site.display_name,
             publisher_url=self.site.site_url,
+            author_id=3,   # Alex Chen — educational content
         )
 
         # Step 7: Publish

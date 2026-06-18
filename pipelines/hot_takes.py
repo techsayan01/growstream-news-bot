@@ -5,6 +5,7 @@ Scans all feeds, picks the most provocative story, publishes fast.
 No editor review. No revision loop. Just the take.
 """
 
+import re
 from datetime import datetime
 
 from agents.researcher import fetch_from_feeds
@@ -86,11 +87,7 @@ Summary: {story['summary'][:500]}"""
 
 @with_retry(max_retries=2, delay=5)
 def _write_context(story: dict, focus_keyword: str) -> str:
-    """Write a 150-200 word 'Why This Matters' context section.
-
-    Adds SEO substance below the punchy hot take to protect against
-    Google's thin-content penalty while keeping the format distinct.
-    """
+    """Write a 150-200 word 'Why This Matters' context section."""
     prompt = f"""\
 You are Jordan Blake, Senior Financial Journalist at GrowStream Media.
 
@@ -116,6 +113,69 @@ Summary: {story['summary'][:600]}"""
     text = _md.sub(r'\*(.+?)\*',     r'<em>\1</em>',         text)
     if not text.startswith("<p"):
         text = f"<p>{text}</p>"
+    return text
+
+
+@with_retry(max_retries=2, delay=5)
+def _write_cfo_briefing(story: dict, focus_keyword: str) -> str:
+    """Write a 150-200 word 'What CFOs and Finance Leaders Should Know' section.
+
+    Practical, forward-looking — what should a senior finance professional
+    actually do or watch as a result of this story?
+    """
+    prompt = f"""\
+You are Jordan Blake, Senior Financial Journalist at GrowStream Media.
+
+Write a 150-200 word "What CFOs and Finance Leaders Should Know" section.
+This is practical and forward-looking — tell the reader what to watch, what to review,
+or what decision this story should inform.
+
+Rules:
+- Use 3-4 bullet points inside a <ul> tag, each starting with a <strong> label
+- Include the focus keyword "{focus_keyword}" once naturally
+- Mention specific institutions, regulators, figures, or dates where possible
+- No emojis. No markdown. Plain HTML only: <ul> with <li> tags.
+- Do NOT repeat analysis already covered earlier in the article
+- Return ONLY the <ul> tag, nothing else
+
+Story:
+Headline: {story['headline']}
+Summary: {story['summary'][:600]}"""
+
+    import re as _md
+    text = call_llm("gemini-2.5-flash", 400, [{"role": "user", "content": prompt}]).strip()
+    text = _md.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    text = _md.sub(r'\*(.+?)\*',     r'<em>\1</em>',         text)
+    if not text.startswith("<ul"):
+        text = f"<ul>{text}</ul>"
+    return text
+
+
+@with_retry(max_retries=2, delay=5)
+def _write_faq(story: dict, focus_keyword: str) -> str:
+    """Write 3 FAQ pairs (question + answer) for featured snippet targeting."""
+    prompt = f"""\
+You are Jordan Blake, Senior Financial Journalist at GrowStream Media.
+
+Write exactly 3 FAQ pairs about this story, targeting Google featured snippets.
+Each question should be something a finance professional would actually search for.
+
+Rules:
+- Each question as <h4>[question ending with ?]</h4>
+- Each answer as <p>[40-60 word direct answer]</p>
+- Include the focus keyword "{focus_keyword}" in at least one answer
+- Questions must end with a question mark
+- No emojis. No markdown. Plain HTML only.
+- Return ONLY the 3 h4+p pairs, nothing else
+
+Story:
+Headline: {story['headline']}
+Summary: {story['summary'][:600]}"""
+
+    import re as _md
+    text = call_llm("gemini-2.5-flash", 500, [{"role": "user", "content": prompt}]).strip()
+    text = _md.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    text = _md.sub(r'\*(.+?)\*',     r'<em>\1</em>',         text)
     return text
 
 
@@ -162,13 +222,12 @@ class HotTakesPipeline(Pipeline):
             log.error("  ✗ Hot take generation failed")
             return
 
-        # Generate focus keyword early — needed for context block
+        # Generate focus keyword early — needed for all sections
         focus_keyword = generate_focus_keyword(story["headline"], "Hot Takes")
 
         today     = datetime.now().strftime("%B %d, %Y")
         pub_date  = datetime.now().strftime("%Y-%m-%dT%H:%M:%S+00:00")
         import re as _re
-        # Strip emojis from LLM-generated content
         content = strip_emojis(content)
 
         # Title: clean, max 60 chars, keep whole words
@@ -183,16 +242,35 @@ class HotTakesPipeline(Pipeline):
         else:
             title = raw_title
 
-        # Slug must be clean ASCII
         slug = _re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:80]
 
-        # Context block — adds ~150 words of factual analysis below the opinion
-        context = strip_emojis(_write_context(story, focus_keyword))
+        # Generate all sections in sequence (each ~150-200 words → total ~650-750w)
+        context      = strip_emojis(_write_context(story, focus_keyword))
+        cfo_briefing = strip_emojis(_write_cfo_briefing(story, focus_keyword))
+        faq_block    = strip_emojis(_write_faq(story, focus_keyword))
 
-        # JSON-LD schema
+        # Build FAQPage JSON-LD from the FAQ block
+        import json as _json
+        faq_pairs = []
+        faq_pattern = re.compile(r'<h4[^>]*>(.*?\?)\s*</h4>\s*<p[^>]*>(.*?)</p>', re.DOTALL | re.IGNORECASE)
+        for m in faq_pattern.finditer(faq_block):
+            q = re.sub(r'<[^>]+>', '', m.group(1)).strip()
+            a = re.sub(r'<[^>]+>', '', m.group(2)).strip()
+            if q and a:
+                faq_pairs.append({"question": q, "answer": a})
+        faq_schema = ""
+        if faq_pairs:
+            faq_schema = f"""<script type="application/ld+json">
+{_json.dumps({"@context": "https://schema.org", "@type": "FAQPage",
+    "mainEntity": [{"@type": "Question", "name": p["question"],
+        "acceptedAnswer": {"@type": "Answer", "text": p["answer"]}}
+        for p in faq_pairs]}, indent=2)}
+</script>"""
+
+        # NewsArticle JSON-LD
         headline_safe = story['headline'].replace('"', '\\"')[:110]
         meta_text     = _re.sub(r'<[^>]+>', '', content).strip()[:155]
-        schema = f"""<script type="application/ld+json">
+        news_schema = f"""<script type="application/ld+json">
 {{
   "@context": "https://schema.org",
   "@type": "NewsArticle",
@@ -200,6 +278,11 @@ class HotTakesPipeline(Pipeline):
   "description": "{meta_text.replace('"', '\\"')}",
   "datePublished": "{pub_date}",
   "dateModified": "{pub_date}",
+  "author": {{
+    "@type": "Person",
+    "name": "Priya Mehta",
+    "jobTitle": "Senior Financial Journalist"
+  }},
   "publisher": {{
     "@type": "Organization",
     "name": "{self.site.display_name}",
@@ -213,17 +296,16 @@ class HotTakesPipeline(Pipeline):
         used_slugs  = self.wp.get_recent_featured_image_slugs(days=7)
         images      = fetch_unsplash_images(["finance opinion editorial"], "finance editorial dark", count=1, used_slugs=used_slugs)
 
-        featured_id  = None
-        unsplash_id  = None
+        featured_id   = None
+        unsplash_id   = None
         hero_img_html = ""
         if images:
             uploaded = self.wp.upload_image(images[0], title)
             if uploaded:
                 featured_id = uploaded["id"]
                 unsplash_id = images[0].get("unsplash_id")
-                # Embed image in article body so it shows regardless of theme settings
-                img_url  = images[0]["url"]
-                img_alt  = f"{focus_keyword} — {story['headline'][:60]}"[:125]
+                img_url          = images[0]["url"]
+                img_alt          = f"{focus_keyword} — {story['headline'][:60]}"[:125]
                 photographer     = images[0].get("photographer", "Unsplash")
                 photographer_url = images[0].get("photographer_url", "https://unsplash.com")
                 hero_img_html = (
@@ -237,14 +319,27 @@ class HotTakesPipeline(Pipeline):
                     f'</figcaption></figure>'
                 )
 
-        html = schema + hero_img_html + f"""
+        # Author bio for Priya Mehta
+        from publishing.wordpress.html import _build_author_bio
+        author_bio = _build_author_bio(4)
+
+        html = news_schema + faq_schema + hero_img_html + f"""
 <div style="background:#EDF2F7;border-left:4px solid #E53E1A;padding:24px 28px;border-radius:8px;margin-bottom:24px;">
   <p style="font-size:0.8em;text-transform:uppercase;letter-spacing:2px;color:#4A5568;margin-top:0;font-family:Helvetica Neue,Arial,sans-serif;">{self.site.display_name} Hot Take &middot; {today}</p>
   {content}
   <p style="margin-bottom:0;font-size:0.8em;color:#718096;">Source: <a href="{story.get('url','#')}" style="color:#2B6CB0;" target="_blank" rel="noopener">{story.get('source','Unknown')}</a></p>
 </div>
+
 <h2 style="font-family:Helvetica Neue,Arial,sans-serif;color:#215387;border-bottom:2px solid #E53E1A;padding-bottom:8px;">Why This Matters</h2>
 {context}
+
+<h2 style="font-family:Helvetica Neue,Arial,sans-serif;color:#215387;border-bottom:2px solid #E53E1A;padding-bottom:8px;">What CFOs and Finance Leaders Should Know</h2>
+{cfo_briefing}
+
+<h2 style="font-family:Helvetica Neue,Arial,sans-serif;color:#215387;border-bottom:2px solid #E53E1A;padding-bottom:8px;">Frequently Asked Questions</h2>
+{faq_block}
+
+{author_bio}
 
 <div style="margin-top:36px;padding-top:20px;border-top:1px solid #EDF2F7;">
   <div style="display:flex;align-items:center;gap:12px;">
@@ -260,7 +355,7 @@ class HotTakesPipeline(Pipeline):
 """
 
         tag_names = generate_tags(story["headline"], focus_keyword, "fintech")
-        tag_ids       = self.wp.get_or_create_tags(tag_names)
+        tag_ids   = self.wp.get_or_create_tags(tag_names)
 
         meta_description = clean_meta_text(content)[:152] + "..."
 

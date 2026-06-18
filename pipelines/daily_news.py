@@ -257,6 +257,7 @@ class DailyNewsPipeline(Pipeline):
                 publisher_name=self.site.display_name,
                 publisher_url=self.site.site_url,
                 related_articles=related,
+                author_id=category.get("author_id"),
             )
             category_id = self.wp.get_category_id(category["slug"])
 

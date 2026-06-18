@@ -16,6 +16,32 @@ from datetime import datetime
 from core.utils import clean_meta_text, strip_emojis
 
 
+# ── Author profiles (keyed by WordPress author_id) ────────────────────────────
+
+_AUTHORS = {
+    3: {
+        "name":     "Alex Chen",
+        "title":    "Senior Markets & Investment Analyst",
+        "bio":      (
+            "Alex Chen covers investment trends, funding rounds, and market data for GrowStream Media. "
+            "With a background in institutional equity research and fintech venture analysis, "
+            "Alex tracks where smart money moves in global finance and AI."
+        ),
+        "initials": "AC",
+    },
+    4: {
+        "name":     "Priya Mehta",
+        "title":    "Senior Financial Journalist & Regulatory Correspondent",
+        "bio":      (
+            "Priya Mehta is GrowStream Media's regulatory and opinion voice, specialising in fintech policy, "
+            "central bank decisions, and the intersection of AI with financial compliance. "
+            "She holds expertise in financial journalism covering APAC, EU, and US regulatory developments."
+        ),
+        "initials": "PM",
+    },
+}
+
+
 # ── Newspaper style CSS (injected once at top of each article) ────────────────
 
 _NEWSPAPER_STYLE = """<style>
@@ -139,6 +165,88 @@ def _build_executive_summary(content: str, headline: str) -> str:
   </ul>
 </div>
 """
+
+
+# ── Table of contents (auto-generated for long articles) ─────────────────────
+
+def _build_toc(content: str) -> str:
+    """Build a linked table of contents from H2 headings.
+
+    Only generated for articles with 3+ H2 headings. Injects anchor IDs into
+    the headings and returns a TOC box to be placed before the article body.
+    Returns (toc_html, modified_content) tuple.
+    """
+    headings = re.findall(r'<h2>(.*?)</h2>', content, re.IGNORECASE | re.DOTALL)
+    # Filter out structural headings that don't belong in the TOC
+    skip = {'faq', 'frequently asked', 'bottom line', 'related reading'}
+    headings = [h for h in headings if not any(s in h.lower() for s in skip)]
+
+    if len(headings) < 3:
+        return "", content
+
+    items = ""
+    modified = content
+    for i, heading in enumerate(headings):
+        text  = re.sub(r'<[^>]+>', '', heading).strip()
+        slug  = re.sub(r'[^a-z0-9]+', '-', text.lower()).strip('-')
+        anchor_id = f"gs-section-{i+1}-{slug[:30]}"
+        items += (
+            f'<li style="margin-bottom:6px;">'
+            f'<a href="#{anchor_id}" style="color:#2B6CB0;text-decoration:none;'
+            f'border-bottom:none;font-family:Helvetica Neue,Arial,sans-serif;font-size:0.95em;">'
+            f'{text}</a></li>\n'
+        )
+        # Inject anchor id into the first matching H2
+        modified = modified.replace(
+            f'<h2>{heading}</h2>',
+            f'<h2 id="{anchor_id}">{heading}</h2>',
+            1,
+        )
+
+    toc_html = f"""
+<div style="background:#F7FAFC;border:1px solid #EDF2F7;border-left:4px solid #E53E1A;
+  padding:20px 24px;border-radius:0 6px 6px 0;margin:0 0 32px;">
+  <p style="margin:0 0 12px;font-family:Helvetica Neue,Arial,sans-serif;font-size:0.78em;
+    text-transform:uppercase;letter-spacing:2px;color:#4A5568;font-weight:700;">In This Article</p>
+  <ol style="margin:0;padding-left:1.4em;color:#1A202C;">
+{items}  </ol>
+</div>"""
+
+    return toc_html, modified
+
+
+# ── Author bio box ────────────────────────────────────────────────────────────
+
+def _build_author_bio(author_id: int | None) -> str:
+    """Build a branded author bio box for E-E-A-T compliance."""
+    if not author_id:
+        return ""
+    author = _AUTHORS.get(author_id)
+    if not author:
+        return ""
+
+    initials = author["initials"]
+    name     = author["name"]
+    title    = author["title"]
+    bio      = author["bio"]
+
+    return f"""
+<div style="display:flex;gap:20px;align-items:flex-start;background:#F7FAFC;
+  border:1px solid #EDF2F7;border-top:3px solid #E53E1A;padding:24px 28px;
+  border-radius:0 0 8px 8px;margin:40px 0 0;">
+  <div style="flex-shrink:0;width:56px;height:56px;border-radius:50%;background:#215387;
+    display:flex;align-items:center;justify-content:center;
+    font-family:Helvetica Neue,Arial,sans-serif;font-size:1.1em;font-weight:700;color:#fff;">
+    {initials}
+  </div>
+  <div style="flex:1;min-width:0;">
+    <p style="margin:0 0 2px;font-family:Helvetica Neue,Arial,sans-serif;
+      font-size:0.95em;font-weight:700;color:#1A202C;">{name}</p>
+    <p style="margin:0 0 10px;font-family:Helvetica Neue,Arial,sans-serif;
+      font-size:0.8em;color:#E53E1A;text-transform:uppercase;letter-spacing:1px;">{title}</p>
+    <p style="margin:0;font-size:0.9em;color:#4A5568;line-height:1.6;">{bio}</p>
+  </div>
+</div>"""
 
 
 # ── FAQ schema extraction ─────────────────────────────────────────────────────
@@ -268,6 +376,7 @@ def build_html(
     publisher_name: str = "GrowStream Media",
     publisher_url: str = "https://growstreammedia.com",
     related_articles: list[dict] | None = None,
+    author_id: int | None = None,
 ) -> str:
     """Assemble the final post HTML with newspaper styling."""
     trend    = story.get("market_trend", "AI & Finance")
@@ -332,21 +441,47 @@ def build_html(
             f'</figcaption></figure>\n'
         )
 
+    # ── Table of contents (before image interleaving so anchors are injected) ─
+    toc_result = _build_toc(content)
+    if isinstance(toc_result, tuple):
+        toc_html, content = toc_result
+    else:
+        toc_html = toc_result
+
     # ── Interleave images after H2 tags ───────────────────────────────────────
     body  = ""
-    parts = content.split("<h2>")
-    for i, part in enumerate(parts):
-        if i == 0:
-            body += part
-        else:
-            body += "<h2>" + part
-            if i == 1 and len(images) > 1:
+    parts = re.split(r'(<h2\b[^>]*>)', content)
+    i = 0
+    h2_count = 0
+    while i < len(parts):
+        chunk = parts[i]
+        if re.match(r'<h2\b', chunk):
+            body += chunk
+            h2_count += 1
+            if h2_count == 1 and len(images) > 1:
+                # append the next content part then the image
+                i += 1
+                if i < len(parts):
+                    body += parts[i]
                 body += img_block(images[1])
-            elif i == 2 and len(images) > 2:
+                i += 1
+                continue
+            elif h2_count == 2 and len(images) > 2:
+                i += 1
+                if i < len(parts):
+                    body += parts[i]
                 body += img_block(images[2])
+                i += 1
+                continue
+        else:
+            body += chunk
+        i += 1
 
     # ── Related Reading ───────────────────────────────────────────────────────
     related_section = build_related_section(related_articles or [])
+
+    # ── Author bio ────────────────────────────────────────────────────────────
+    author_bio = _build_author_bio(author_id)
 
     # ── Article footer ────────────────────────────────────────────────────────
     footer = _build_footer(
@@ -363,7 +498,8 @@ def build_html(
         news_schema + faq_schema +
         _NEWSPAPER_STYLE +
         '<div class="gs-article">' +
-        badge + exec_summary + body + related_section + footer +
+        badge + exec_summary + toc_html + body +
+        related_section + author_bio + footer +
         '</div>'
     )
     return strip_emojis(final)
