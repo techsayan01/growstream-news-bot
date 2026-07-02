@@ -1,38 +1,9 @@
 name: GrowStream News Bot
 
 on:
-  schedule:
-    # All times UTC (IST = UTC+5:30, GMT = UTC+0, EST = UTC-5, PST = UTC-8)
-    #
-    # Schedule designed to hit 4 global finance audiences:
-    #   India morning   → 09:00 IST  (03:30 UTC)
-    #   London open     → 13:30 IST  (08:00 UTC)
-    #   US East morning → 18:30 IST  (13:00 UTC)
-    #   US midday       → 20:30 IST  (15:00 UTC)
-    #
-    # ── Evergreen — Mon–Fri, early IST (SEO indexing before peak traffic) ────
-    - cron: '30 1 * * 1,2,3,4,5'    # 07:00 IST
-
-    # ── Daily News — 3 runs hitting India / London / US East ────────────────
-    - cron: '30 3 * * *'             # 09:00 IST  (03:30 UTC)
-    - cron: '0 8 * * *'              # 13:30 IST  (08:00 UTC) — London open
-    - cron: '0 13 * * *'             # 18:30 IST  (13:00 UTC) — US East morning
-
-    # ── Hot Takes — India midday + US midday ────────────────────────────────
-    - cron: '30 5 * * *'             # 11:00 IST  (05:30 UTC)
-    - cron: '0 15 * * *'             # 20:30 IST  (15:00 UTC) — 10:00 EST / 07:00 PST
-
-    # ── Follow the Money — Mon / Wed / Fri, London open ─────────────────────
-    - cron: '0 9 * * 1,3,5'          # 14:30 IST  (09:00 UTC) — 09:00 GMT
-
-    # ── Translated — Tue / Thu, London open ─────────────────────────────────
-    - cron: '30 9 * * 2,4'           # 15:00 IST  (09:30 UTC) — 09:30 GMT
-
-    # ── Dumbest Move — Sunday US midday ─────────────────────────────────────
-    - cron: '0 17 * * 0'             # 22:30 IST  (17:00 UTC) — 12:00 EST / 09:00 PST
-
-    # ── Leaderboards — 1st of month, India morning ──────────────────────────
-    - cron: '0 4 1 * *'              # 09:30 IST  (04:00 UTC)
+  # ── Scheduled runs PAUSED — re-enable by restoring the schedule: block ────
+  # To resume: uncomment the schedule block in this file and push.
+  # To run manually: use the workflow_dispatch trigger below.
 
   # Manual trigger
   workflow_dispatch:
