@@ -100,7 +100,10 @@ _NEWSPAPER_STYLE = """<style>
 def _build_executive_summary(content: str, headline: str) -> str:
     """Auto-extract key points from article HTML for an executive summary box.
 
-    Only generated for articles over 800 words. Extracts bullet points from:
+    Only generated for genuinely long articles (1200+ words). Shorter articles
+    already carry a Key Takeaways box and a table of contents, so an auto
+    Executive Summary on top of those is redundant furniture that just adds
+    length. Extracts bullet points from:
     1. Text inside the Key Takeaways box (if present)
     2. First sentence of each H2 section
     3. Any stat callout figures
@@ -111,7 +114,7 @@ def _build_executive_summary(content: str, headline: str) -> str:
     plain = re.sub(r'\s+', ' ', plain).strip()
     words = len(plain.split())
 
-    if words < 800:
+    if words < 1200:
         return ""
 
     bullets = []
