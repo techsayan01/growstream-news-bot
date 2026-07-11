@@ -87,29 +87,15 @@ TEMPLATES: dict[str, dict] = {
 {_WINNER_LOSER}
 
 <h2>What Happened</h2>
-2 paragraphs (~150 words total). Facts first — who, what, when, where.
+2 tight paragraphs (~120 words total). Facts first — who, what, when, where.
 
 <h2>Why It Matters for Finance Professionals</h2>
-2 paragraphs (~200 words). Use <strong> on every key metric, dollar figure, percentage, company name.
+2 paragraphs (~150 words). Use <strong> on every key metric, dollar figure, percentage, company name.
 
 <h2>Key Facts and Data Points</h2>
-Bullet list of 5–7 concrete facts, numbers, or quotes from the source.
+Bullet list of 5 concrete facts, numbers, or quotes from the source.
 
 {_STAT_CALLOUT}
-
-<h2>Industry Context</h2>
-2 paragraphs (~150 words). How does this fit the bigger picture?
-
-<h2>What Finance Leaders Should Watch</h2>
-2 paragraphs (~150 words). Forward-looking, practical.
-
-<h2>Global Market Angles</h2>
-<h3>Asia</h3>
-~60 words. India (RBI, SEBI, HDFC, Paytm), China (PBOC, Alipay), Japan (FSA, SoftBank), Singapore (MAS).
-<h3>Europe</h3>
-~60 words. ECB, FCA, Bundesbank, Deutsche Bank, Revolut, Klarna, DORA/MiCA.
-<h3>United States</h3>
-~60 words. Fed, SEC, OCC, Goldman Sachs, JPMorgan, Stripe, Nasdaq.
 
 <h2>The Contrarian Take</h2>
 ~80 words starting with exactly: "Here's what nobody's saying about this:"
@@ -121,13 +107,12 @@ Bullet list of 5–7 concrete facts, numbers, or quotes from the source.
         "writer_rules": (
             "Use <strong> on every key metric, percentage, dollar figure, and company name. "
             "The Contrarian Take MUST start with 'Here\\'s what nobody\\'s saying about this:'. "
-            "Global Market Angles must cover Asia, Europe, and US sub-sections."
+            "Keep the whole article to 700-900 words — be concise, cut any sentence that does not add a fact or an argument."
         ),
 
         "editor_checklist": [
             "15 Sec Read summary box present at top",
             "Winner/Loser two-column box present",
-            "Global Market Angles has Asia, Europe, US sub-sections",
             "Contrarian Take starts with 'Here's what nobody's saying about this:'",
             "At least one stat callout box with a highlighted figure",
             "FAQ has 3 genuine answers (40-60 words each)",
@@ -393,15 +378,7 @@ Bullet list of 5-6 concrete features — be specific, no marketing fluff.
 </ul>
 
 <h2>What This Signals About the Market</h2>
-2 paragraphs (~200 words). What does smart money moving here reveal about macro trends in fintech/AI finance?
-
-<h2>Global Ripple Effect</h2>
-<h3>Asia</h3>
-~60 words on implications for Asian fintech markets.
-<h3>Europe</h3>
-~60 words on implications for European markets.
-<h3>United States</h3>
-~60 words on US market implications.
+2 paragraphs (~180 words). What does smart money moving here reveal about macro trends in fintech/AI finance?
 
 {_BOTTOM_LINE}
 
@@ -410,7 +387,8 @@ Bullet list of 5-6 concrete features — be specific, no marketing fluff.
         "writer_rules": (
             "The Deal at a Glance snapshot MUST include amount, round type, and lead investor — use 'N/A' if not in the source. "
             "Do NOT fabricate investor names or valuation figures. "
-            "The 'Who Doesn't Benefit' section must include at least one entity that loses out."
+            "The 'Who Doesn't Benefit' section must include at least one entity that loses out. "
+            "Keep the whole article to 700-900 words."
         ),
 
         "editor_checklist": [
@@ -418,7 +396,6 @@ Bullet list of 5-6 concrete features — be specific, no marketing fluff.
             "Where the Money Goes section present",
             "Who Benefits/Loses list with at least one loser",
             "What This Signals section with market context",
-            "Global Ripple Effect with Asia, Europe, US",
             "No fabricated investor names or valuations",
         ],
     },
@@ -533,15 +510,7 @@ Bullet list of 5-6 concrete features — be specific, no marketing fluff.
 Bullet list of 4-5 specific sectors, assets, or entities with one sentence on each.
 
 <h2>The Macro Context</h2>
-2 paragraphs. Where does this fit in the broader macro cycle? Interest rates, inflation, dollar strength?
-
-<h2>Regional Ripple</h2>
-<h3>Asia</h3>
-~60 words on Asian market impact.
-<h3>Europe</h3>
-~60 words on European market impact.
-<h3>United States</h3>
-~60 words on US market impact.
+2 paragraphs (~180 words). Where does this fit in the broader macro cycle? Interest rates, inflation, dollar strength?
 
 <h2>What to Watch Next</h2>
 Bullet list of 4-5 upcoming events or data points that will determine the next move.
@@ -553,14 +522,14 @@ Bullet list of 4-5 upcoming events or data points that will determine the next m
         "writer_rules": (
             "Populate the Numbers table only with figures from the source — use 'N/A' where data is unavailable. "
             "Percentage changes must be coloured green (#28a745) for gains, red (#dc3545) for losses. "
-            "The 'What to Watch Next' list must include specific upcoming events (e.g. 'Fed meeting June 12') not vague phrases."
+            "The 'What to Watch Next' list must include specific upcoming events (e.g. 'Fed meeting June 12') not vague phrases. "
+            "Keep the whole article to 700-900 words."
         ),
 
         "editor_checklist": [
             "Numbers table present with at least 2 assets and % change",
             "% changes colour-coded green/red",
             "What's Driving It section with specific catalyst",
-            "Regional Ripple has Asia, Europe, US",
             "What to Watch Next list with specific upcoming events",
         ],
     },

@@ -11,24 +11,58 @@ from core.llm import call_llm_with_fallback
 from core.retry import with_retry
 from core.utils import log
 
-PERSONA = """\
+# ── Author personas ───────────────────────────────────────────────────────────
+# Keyed by the WordPress author_id used in the site config (feeds.py) and the
+# author bio box (publishing/wordpress/html.py). Keeping the writing voice
+# matched to the byline is an E-E-A-T signal: the bio, the byline, and the
+# actual prose all describe the same person.
+
+_AUTHOR_PERSONAS: dict[int, str] = {
+    3: """\
+You are Alex Chen, Senior Markets & Investment Analyst at GrowStream Media.
+Background: former institutional equity researcher, now covering funding rounds,
+market moves, and finance data for GrowStream. You think in numbers and second-order
+effects.
+
+Voice & Personality:
+- Analytical and precise. You lead with the data and let the figures carry the argument.
+- You are calm and measured, but not dry — you always answer "so what does this mean
+  for where capital flows next?".
+- You write in first-person editorial ("the number that jumps out is...", "our read is...").
+- You name specific companies, funds, and figures. You never hide behind vague phrasing.
+- You never fabricate statistics. If the source doesn't have it, you don't say it.""",
+
+    4: """\
+You are Priya Mehta, Senior Financial Journalist & Regulatory Correspondent at GrowStream Media.
+Background: financial journalist specialising in fintech policy, central-bank decisions,
+and the intersection of AI with financial compliance across APAC, EU, and US.
+
+Voice & Personality:
+- Authoritative and clear. You translate dense regulation and policy into plain,
+  actionable takeaways for CFOs and compliance leaders.
+- You are sharp and willing to call out regulatory theatre, weak enforcement, or hype.
+- You write in first-person editorial ("what regulators are really signalling is...",
+  "the part compliance teams should read twice is...").
+- You cite specific regulators, rules, dates, and figures. You never fabricate them.""",
+}
+
+_DEFAULT_PERSONA = """\
 You are Jordan Blake, Senior Financial Journalist at GrowStream Media.
 Background: 12 years writing for Bloomberg, FT, and now GrowStream. Specialist in
 translating complex fintech and AI developments into clear, actionable analysis for
 sophisticated finance professionals — CFOs, venture investors, and heads of strategy.
 
 Voice & Personality:
-- You are sharp, slightly irreverent, and never boring. You respect the reader's
-  intelligence and write for someone who has already read the FT this morning.
-- You use occasional dry humour and aren't afraid to say when something is
-  overhyped, underreported, or just plain dumb corporate theatre.
-- You write in first person editorial ("we think", "here's what caught our eye",
-  "the part nobody's talking about is...").
-- You use analogies, digressions, and specific names. You never write a paragraph
-  that starts with "In conclusion, it is evident that...".
-- You always answer "so what?" — every section must make a concrete point,
-  not just describe what happened.
-- You never fabricate statistics. If the source doesn't have it, you don't say it.
+- Sharp, slightly irreverent, and never boring. You write for someone who has already
+  read the FT this morning.
+- You use dry humour and aren't afraid to say when something is overhyped or just
+  plain dumb corporate theatre.
+- You write in first-person editorial ("here's what caught our eye", "the part nobody's
+  talking about is...").
+- You always answer "so what?" and never fabricate statistics."""
+
+# Shared standards appended to whichever author persona is selected.
+_SHARED_STANDARDS = """\
 
 Your editor Priya Sharma will review every article before it goes live. She scores on
 two axes and WILL reject anything that misses. Internalise her standards now:
@@ -41,11 +75,10 @@ SEO standards (target 7+/10):
 
 Editorial quality standards (target 7+/10):
 - "15 Sec Read" summary box MUST be the very first element after the hook.
-- Winner/Loser two-column box MUST follow immediately after the summary box.
-- "Global Market Angles" section MUST contain Asia, Europe, and US sub-sections.
-- "The Contrarian Take" section MUST start with "Here's what nobody's saying about this:"
 - <strong> tags on every key metric, percentage, dollar figure, and company name.
 - No walls of text — every section should use bullets, blockquotes, or short paragraphs.
+- Keep the article tight: 700–900 words. Cut any sentence that does not add a fact or
+  an argument. Length for its own sake is penalised.
 - FAQ answers must be genuinely useful (40–60 words), not generic filler.
 - Do NOT pad with phrases like "it remains to be seen", "time will tell", or
   "this is a space worth watching". Every sentence must earn its place.
@@ -53,7 +86,14 @@ Editorial quality standards (target 7+/10):
 """
 
 
-# Old _ARTICLE_STRUCTURE removed — all templates now live in content/templates.py
+def _build_persona(author_id: int | None) -> str:
+    """Return the full persona block (identity + shared standards) for an author."""
+    identity = _AUTHOR_PERSONAS.get(author_id, _DEFAULT_PERSONA) if author_id else _DEFAULT_PERSONA
+    return identity + "\n" + _SHARED_STANDARDS
+
+
+# Backwards-compatible default persona string (Jordan Blake) for any legacy import.
+PERSONA = _DEFAULT_PERSONA + "\n" + _SHARED_STANDARDS
 
 
 @with_retry(max_retries=3, delay=5)
@@ -64,17 +104,24 @@ def write_article(
     editor_notes: str = "",
     previous_article: str = "",
     article_type: str = "breaking_news",
+    author_id: int | None = None,
 ) -> str | None:
     """Write or revise an SEO-optimised article using the template for *article_type*.
 
-    When *editor_notes* and *previous_article* are provided, Jordan revises the
-    existing draft based on editor feedback.
-    Otherwise an initial draft is written from scratch.
+    When *editor_notes* and *previous_article* are provided, the author revises the
+    existing draft based on editor feedback. Otherwise an initial draft is written
+    from scratch.
+
+    *author_id* selects the writing persona (see _AUTHOR_PERSONAS) so the prose
+    voice matches the byline and bio box. Falls back to the category's author_id,
+    then to the default Jordan Blake persona.
     """
     focus_kw = story.get("focus_keyword", category["name"].lower())
     template  = get_template(article_type)
     structure = template["structure"]
     extra_rules = template["writer_rules"]
+
+    persona = _build_persona(author_id if author_id is not None else category.get("author_id"))
 
     # Model selection via NEWSBOT_WRITER env var:
     #   flash       → gemini-2.5-flash (default, cheapest)
@@ -89,8 +136,8 @@ def write_article(
     }.get(_WRITER_ENV, ["gemini-2.5-flash"])
 
     if editor_notes and previous_article:
-        log.info("  ✍️  Jordan Blake is revising based on editor feedback…")
-        prompt = f"""{PERSONA}
+        log.info("  ✍️  Author is revising based on editor feedback…")
+        prompt = f"""{persona}
 
 ARTICLE TYPE: {article_type}
 
@@ -108,7 +155,7 @@ PREVIOUS DRAFT:
 {previous_article}"""
 
     else:
-        log.info(f"  ✍️  Jordan Blake is writing [{article_type}] draft…")
+        log.info(f"  ✍️  Author is writing [{article_type}] draft…")
 
         # Build rich source block from all extracted fields
         source_lines = [
@@ -125,7 +172,7 @@ PREVIOUS DRAFT:
             source_lines.append(f"- Direct quotes (USE VERBATIM in blockquotes): {json.dumps(story['direct_quotes'])}")
         source_block = "\n".join(source_lines)
 
-        prompt = f"""{PERSONA}
+        prompt = f"""{persona}
 
 ARTICLE TYPE: {article_type}
 
@@ -137,7 +184,7 @@ Focus keyword (use naturally 4–6 times): "{focus_kw}"
 SOURCE MATERIAL — use ONLY the facts, figures, and entities below. Do not invent anything:
 {source_block}
 
-Write an 800–1200 word SEO-optimised article using this EXACT structure:
+Write a 700–900 word SEO-optimised article using this EXACT structure:
 {structure}
 
 Rules:

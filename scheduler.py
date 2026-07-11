@@ -1,17 +1,18 @@
 """
 GrowStream scheduler — runs as a persistent process (alternative to GHA).
 
-Schedule designed to hit 4 global finance audiences:
+Schedule designed to hit global finance audiences at a deliberately reduced
+volume — high-volume AI publishing on YMYL finance topics gets throttled by
+Google's Helpful Content system, so fewer, tighter articles index better:
   India morning   →  09:00 IST
-  London open     →  13:30 IST  (08:00 GMT)
   US East morning →  18:30 IST  (08:00 EST)
   US midday       →  20:30 IST  (10:00 EST / 07:00 PST)
 
 Daily output:
-  15 news articles  (3 × daily_news)
-   2 hot takes      (India midday + US midday)
-   1 evergreen      (Mon–Fri, early IST)
-   Specialist pipelines spread across London / US slots
+  ~6 news articles  (2 × daily_news × 3 categories)
+   1 hot take       (US midday)
+   1 evergreen      (Mon–Fri, early IST — indexable pillar content)
+   Specialist pipelines: Follow-the-Money (Wed), Translated (Thu)
 
 Usage:
     venv/bin/python3.13 scheduler.py
@@ -56,21 +57,19 @@ schedule.every().thursday.at("07:00").do(_run, "evergreen")
 schedule.every().friday.at("07:00").do(_run, "evergreen")
 
 # ── Daily News — region-targeted ─────────────────────────────────────────────
+# Trimmed from 3 slots to 2 (dropped the London slot) to cut daily article
+# volume — see REGIONAL_CATEGORIES note in feeds.py. India + US East give
+# broad global coverage across two time zones.
 schedule.every().day.at("09:00").do(_run, "daily_news", "india")    # India morning
-schedule.every().day.at("13:30").do(_run, "daily_news", "london")   # London open (08:00 GMT)
 schedule.every().day.at("18:30").do(_run, "daily_news", "us-east")  # US East morning (08:00 EST)
 
-# ── Hot Takes — India midday + US midday ──────────────────────────────────────
-schedule.every().day.at("11:00").do(_run, "hot_takes")    # India midday
+# ── Hot Takes — US midday only (was India midday + US midday) ─────────────────
 schedule.every().day.at("20:30").do(_run, "hot_takes")    # US midday (10:00 EST / 07:00 PST)
 
-# ── Follow the Money — Mon / Wed / Fri at London open ────────────────────────
-schedule.every().monday.at("14:30").do(_run, "follow_the_money")    # 09:00 GMT
+# ── Follow the Money — Wednesday only (was Mon / Wed / Fri) ───────────────────
 schedule.every().wednesday.at("14:30").do(_run, "follow_the_money") # 09:00 GMT
-schedule.every().friday.at("14:30").do(_run, "follow_the_money")    # 09:00 GMT
 
-# ── Translated — Tue / Thu at London open ────────────────────────────────────
-schedule.every().tuesday.at("15:00").do(_run, "translated")          # 09:30 GMT
+# ── Translated — Thursday only (was Tue / Thu) ───────────────────────────────
 schedule.every().thursday.at("15:00").do(_run, "translated")         # 09:30 GMT
 
 # ── Dumbest Move — Sunday US midday ──────────────────────────────────────────
@@ -92,10 +91,8 @@ if __name__ == "__main__":
     slots = [
         ("07:00", "evergreen (Mon-Fri)", "01:30", "20:30(-1)", "17:30(-1)"),
         ("09:00", "daily_news",          "03:30", "22:30(-1)", "19:30(-1)"),
-        ("11:00", "hot_takes",           "05:30", "00:30",     "21:30(-1)"),
-        ("13:30", "daily_news",          "08:00", "03:00",     "00:00"),
-        ("14:30", "follow_the_money",    "09:00", "04:00",     "01:00"),
-        ("15:00", "translated",          "09:30", "04:30",     "01:30"),
+        ("14:30", "follow_the_money(W)", "09:00", "04:00",     "01:00"),
+        ("15:00", "translated (Thu)",    "09:30", "04:30",     "01:30"),
         ("18:30", "daily_news",          "13:00", "08:00 ✓",   "05:00"),
         ("20:30", "hot_takes",           "15:00", "10:00 ✓",   "07:00 ✓"),
         ("22:30", "dumbest_move (Sun)",  "17:00", "12:00 ✓",   "09:00 ✓"),

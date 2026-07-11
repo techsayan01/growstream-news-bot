@@ -26,9 +26,10 @@ _ALL_KEYWORDS = [
     "raised", "billion", "million", "crypto", "fraud", "merger", "IPO",
 ]
 
+# Byline for Hot Takes is author_id=4 (Priya Mehta) — keep the writing voice matched.
 _PERSONA = """\
-You are Jordan Blake, Senior Financial Journalist at GrowStream Media.
-You are sharp, irreverent, and never boring. You have hot opinions and you say them out loud.
+You are Priya Mehta, Senior Financial Journalist at GrowStream Media.
+You are sharp, authoritative, and never boring. You have hot opinions and you say them out loud.
 """
 
 
@@ -89,7 +90,7 @@ Summary: {story['summary'][:500]}"""
 def _write_context(story: dict, focus_keyword: str) -> str:
     """Write a 150-200 word 'Why This Matters' context section."""
     prompt = f"""\
-You are Jordan Blake, Senior Financial Journalist at GrowStream Media.
+You are Priya Mehta, Senior Financial Journalist at GrowStream Media.
 
 Write a 150-200 word "Why This Matters" context section for finance professionals.
 This sits BELOW a punchy hot take opinion paragraph — so this section should be
@@ -124,7 +125,7 @@ def _write_cfo_briefing(story: dict, focus_keyword: str) -> str:
     actually do or watch as a result of this story?
     """
     prompt = f"""\
-You are Jordan Blake, Senior Financial Journalist at GrowStream Media.
+You are Priya Mehta, Senior Financial Journalist at GrowStream Media.
 
 Write a 150-200 word "What CFOs and Finance Leaders Should Know" section.
 This is practical and forward-looking — tell the reader what to watch, what to review,
@@ -155,7 +156,7 @@ Summary: {story['summary'][:600]}"""
 def _write_faq(story: dict, focus_keyword: str) -> str:
     """Write 3 FAQ pairs (question + answer) for featured snippet targeting."""
     prompt = f"""\
-You are Jordan Blake, Senior Financial Journalist at GrowStream Media.
+You are Priya Mehta, Senior Financial Journalist at GrowStream Media.
 
 Write exactly 3 FAQ pairs about this story, targeting Google featured snippets.
 Each question should be something a finance professional would actually search for.
