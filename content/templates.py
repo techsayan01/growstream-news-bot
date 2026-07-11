@@ -129,7 +129,7 @@ Bullet list of 5 concrete facts, numbers, or quotes from the source.
 {_STAT_CALLOUT}
 1 paragraph putting this figure in context — why this number is surprising or significant.
 
-<h2>5 Key Findings</h2>
+<h2>3 Key Findings</h2>
 For each finding, use a stat callout then 1-2 sentences of commentary:
 <h3>Finding 1: [Title]</h3>
 {_STAT_CALLOUT}
@@ -138,13 +138,9 @@ For each finding, use a stat callout then 1-2 sentences of commentary:
 [stat callout + commentary]
 <h3>Finding 3: [Title]</h3>
 [stat callout + commentary]
-<h3>Finding 4: [Title]</h3>
-[stat callout + commentary]
-<h3>Finding 5: [Title]</h3>
-[stat callout + commentary]
 
 <h2>What the Data Really Says</h2>
-2 paragraphs (~200 words). Go beyond the headline — what's the underlying trend?
+2 paragraphs (~150 words). Go beyond the headline — what's the underlying trend?
 
 <h2>Methodology Note</h2>
 <div style="background:#f8f9fa;border:1px solid #dee2e6;padding:14px 18px;border-radius:6px;font-size:0.9em;color:#555;">
@@ -152,9 +148,7 @@ For each finding, use a stat callout then 1-2 sentences of commentary:
 </div>
 
 <h2>Implications for CFOs and Finance Leaders</h2>
-Bullet list of 4-5 specific, actionable implications.
-
-{_ACTION_CHECKLIST}
+Bullet list of 3-4 specific, actionable implications.
 
 {_BOTTOM_LINE}
 
@@ -164,15 +158,15 @@ Bullet list of 4-5 specific, actionable implications.
             "Every key finding MUST have a stat callout div with a bold highlighted figure. "
             "Do NOT fabricate statistics — only use numbers from the source material. "
             "The Methodology Note must accurately reflect what the source says about data collection. "
-            "Bold (<strong>) every percentage, dollar figure, and company name."
+            "Bold (<strong>) every percentage, dollar figure, and company name. "
+            "Keep the whole article to 700-900 words."
         ),
 
         "editor_checklist": [
             "15 Sec Read summary box present",
             "Hero stat callout box with a highlighted headline figure",
-            "5 Key Findings with individual stat callouts",
+            "3 Key Findings with individual stat callouts",
             "Methodology Note section present",
-            "Action checklist for finance leaders",
             "No fabricated statistics",
         ],
     },
@@ -253,7 +247,8 @@ Bullet list of 3-4 analyst/market reactions if available, or Jordan's assessment
         "writer_rules": (
             "Populate the At-a-Glance table ONLY with figures from the source — leave cells as 'N/A' if data isn't available. "
             "Do NOT invent analyst quotes. The Beat/Miss badge colour must match the actual result. "
-            "Bold every financial figure. Include a stat callout for the forward guidance number."
+            "Bold every financial figure. Include a stat callout for the forward guidance number. "
+            "Keep the whole article to 700-900 words."
         ),
 
         "editor_checklist": [
@@ -288,7 +283,7 @@ Bullet list of 5-6 concrete features — be specific, no marketing fluff.
 </div>
 
 <h2>Who It's For</h2>
-2 paragraphs. Primary use cases and target buyer profile. Be specific — "mid-market CFOs running SAP" beats "finance teams".
+1 tight paragraph. Primary use cases and target buyer profile. Be specific — "mid-market CFOs running SAP" beats "finance teams".
 
 <h2>How It Stacks Up</h2>
 <div style="overflow-x:auto;margin:20px 0;">
@@ -337,7 +332,8 @@ Bullet list of 5-6 concrete features — be specific, no marketing fluff.
             "The product description box must clearly explain what the product does in plain English. "
             "The comparison table must only include real competitors — do not fabricate feature comparisons. "
             "Jordan's Verdict must be opinionated and specific, not generic praise. "
-            "Pricing callout must reflect the actual pricing from the source."
+            "Pricing callout must reflect the actual pricing from the source. "
+            "Keep the whole article to 700-900 words."
         ),
 
         "editor_checklist": [
@@ -438,9 +434,6 @@ Bullet list of 5-6 concrete features — be specific, no marketing fluff.
   </ul>
 </div>
 
-<h2>What Finance Leaders Should Watch</h2>
-2 paragraphs. Is this the start of a wider enforcement wave? What policies need reviewing?
-
 {_BOTTOM_LINE}
 
 {_FAQ}""",
@@ -449,7 +442,8 @@ Bullet list of 5-6 concrete features — be specific, no marketing fluff.
             "The Severity badge must be one of CRITICAL / HIGH / MEDIUM — choose based on penalty scale and precedent. "
             "Use the exact penalty figure in a stat callout. "
             "The Action Checklist must contain specific, actionable steps — not generic 'review your compliance'. "
-            "Deadlines section must only include dates from the source."
+            "Deadlines section must only include dates from the source. "
+            "Keep the whole article to 700-900 words."
         ),
 
         "editor_checklist": [
